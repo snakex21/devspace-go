@@ -4,6 +4,7 @@
 /devspace
 /devspace-gui
 *.exe
+!tools/cloudflared.exe
 
 # Build output
 build/
