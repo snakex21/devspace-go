@@ -1,8 +1,8 @@
-# DevSpace (Go Edition)
+# MCP WebCoder
 
 **Give ChatGPT & Claude secure access to your local machine. Turn any MCP host into your coding partner.**
 
-DevSpace is a self-hosted MCP server that lets AI assistants read, edit, search, and run code in your real local projects — your files, your tools, your terminal — without uploading anything to a third party. You run it on your machine, expose it through a tunnel you control, and optionally secure it with a password.
+MCP WebCoder is a self-hosted MCP server that lets AI assistants read, edit, search, and run code in your real local projects — your files, your tools, your terminal — without uploading anything to a third party. You run it on your machine, expose it through a tunnel you control, and optionally secure it with a password.
 
 ---
 
@@ -27,7 +27,7 @@ DevSpace is a self-hosted MCP server that lets AI assistants read, edit, search,
 | [Čeština](readme/cs.md) | [Dansk](readme/da.md) | [Deutsch](readme/de.md) | [Ελληνικά](readme/el.md) | [English](readme/en.md) |
 | [Español](readme/es.md) | [Eesti](readme/et.md) | [فارسی](readme/fa.md) | [Suomi](readme/fi.md) | [Français](readme/fr.md) |
 | [Gaeilge](readme/ga.md) | [עברית](readme/he.md) | [हिन्दी](readme/hi.md) | [Hrvatski](readme/hr.md) | [Magyar](readme/hu.md) |
-| [Bahasa](readme/id.md) | [Italiano](readme/it.md) | [日本語](readme/ja.md) | [한국어](readme/ko.md) | [Lietuvių](readme/lt.md) |
+| [Indonesia](readme/id.md) | [Italiano](readme/it.md) | [日本語](readme/ja.md) | [한국어](readme/ko.md) | [Lietuvių](readme/lt.md) |
 | [Latviešu](readme/lv.md) | [Melayu](readme/ms.md) | [Malti](readme/mt.md) | [Nederlands](readme/nl.md) | [Norsk](readme/no.md) |
 | [Polski](readme/pl.md) | [Português](readme/pt.md) | [Română](readme/ro.md) | [Русский](readme/ru.md) | [Slovenčina](readme/sk.md) |
 | [Slovenščina](readme/sl.md) | [Српски](readme/sr.md) | [Svenska](readme/sv.md) | [Kiswahili](readme/sw.md) | [தமிழ்](readme/ta.md) |
@@ -47,13 +47,13 @@ Pick your platform from [Releases](../../releases) or build from source:
 
 ### 2. Configure (GUI or text)
 ```bash
-devspace-gui                  # Desktop configurator (GUI)
-devspace init                 # Text-based configurator
+mcp-webcoder-gui              # Desktop configurator (GUI)
+mcp-webcoder init             # Text-based configurator
 ```
 
 ### 3. Run
 ```bash
-devspace                      # Starts server. Auto-detects config.
+mcp-webcoder                  # Starts server. Auto-detects config.
 ```
 
 This also auto-starts a Cloudflare Tunnel if `cloudflared` is found in `tools/`.
@@ -72,10 +72,10 @@ No Node.js, no npm, no Python. Single binary.
 
 | Platform | Download |
 |---|---|
-| **Windows** | `devspace.exe` + `devspace-gui.exe` |
-| **Linux** | `devspace` (GUI: compile natively) |
-| **macOS Intel** | `devspace` (GUI: compile natively) |
-| **macOS M-chip** | `devspace` (GUI: compile natively) |
+| **Windows** | `mcp-webcoder.exe` + `mcp-webcoder-gui.exe` |
+| **Linux** | `mcp-webcoder` (GUI: compile natively) |
+| **macOS Intel** | `mcp-webcoder` (GUI: compile natively) |
+| **macOS M-chip** | `mcp-webcoder` (GUI: compile natively) |
 
 Requires **Go 1.23+** only if building from source.
 
@@ -89,7 +89,7 @@ Once connected, the AI can open one of your approved project folders as a worksp
 - **Search code** with regex and inspect directories
 - **Run shell commands** (PowerShell on Windows, bash on Unix)
 - **Discover project instructions** from `AGENTS.md` / `CLAUDE.md`
-- **Auto-configure** with portable `.devspace/config.json`
+- **Auto-configure** with portable `.webcoder/config.json`
 
 8 MCP tools: `open_workspace`, `read`, `write`, `edit`, `grep`, `glob`, `ls`, `bash`
 
@@ -100,7 +100,7 @@ Once connected, the AI can open one of your approved project folders as a worksp
 All config lives **in the same folder as the executable** (portable):
 
 ```
-.devspace/
+.webcoder/
 ├── config.json       ← allowed roots, port, shell, language, auth
 └── auth.json         ← owner password (optional)
 ```
@@ -132,11 +132,11 @@ No environment variables needed — everything is in the portable config file.
 
 ## Tunnel (Remote Access)
 
-For ChatGPT web version (HTTPS required), DevSpace auto-starts a tunnel:
+For ChatGPT web version (HTTPS required), MCP WebCoder auto-starts a tunnel:
 
 | Tunnel | URL type | Setup |
 |---|---|---|
-| **Cloudflare** | Random (auto) | Put `cloudflared.exe` in `tools/` |
+| **Cloudflare** | Random (auto) | `cloudflared.exe` included in `tools/` |
 | **Pinggy** | Stable | Needs SSH key (`ssh-keygen`) |
 
 Server auto-detects which one is available. Restart the server for a new Cloudflare URL, or use Pinggy for a permanent URL.
@@ -168,8 +168,8 @@ Set `"shell"` in config.json or choose in the GUI.
 ## Building from Source
 
 ```bash
-git clone https://github.com/waishnav/devspace-go
-cd devspace-go
+git clone https://github.com/snakex21/mcp-webcoder
+cd mcp-webcoder
 
 # Build everything (all platforms)
 .\scripts\windows\build.ps1     # Windows
@@ -177,8 +177,8 @@ cd devspace-go
 make -f scripts/unix/Makefile    # Linux / Mac (make)
 
 # Build just for current platform
-go build -o devspace ./cmd/devspace/
-go build -o devspace-gui ./cmd/devspace-gui/
+go build -o mcp-webcoder ./cmd/devspace/
+go build -o mcp-webcoder-gui ./cmd/devspace-gui/
 ```
 
 ---
@@ -199,7 +199,7 @@ GUI requires Fyne (OpenGL) — cannot cross-compile. Server compiles everywhere.
 ## Project Structure
 
 ```
-devspace-go/
+mcp-webcoder/
 ├── cmd/
 │   ├── devspace/           ← CLI + MCP server
 │   └── devspace-gui/       ← Desktop GUI configurator (Fyne)
@@ -209,16 +209,15 @@ devspace-go/
 │   ├── locales/            ← 47 language translations
 │   ├── logger/             ← Structured logging (zerolog)
 │   ├── server/             ← HTTP + MCP + tunnel orchestration
-│   ├── skills/             ← AGENTS.md / skill discovery
 │   ├── store/              ← SQLite workspace sessions
 │   ├── tools/              ← read, write, edit, grep, glob, ls, bash
 │   └── workspace/          ← Workspace & path validation
 ├── scripts/
 │   ├── windows/            ← PowerShell build script
-│   └── unix/               ← Bash + Makefile build scripts
+│   ├── unix/               ← Bash + Makefile build scripts
+│   └── userscripts/        ← Tampermonkey auto-approve script
 ├── readme/                 ← Translations of this file (47 languages)
-├── build/                  ← Compiled binaries (all platforms)
-├── tools/                  ← cloudflared.exe, etc.
+├── tools/                  ← cloudflared.exe
 ├── go.mod / go.sum
 └── README.md
 ```
