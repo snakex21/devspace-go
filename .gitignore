@@ -1,0 +1,28 @@
+# Binaries
+*.exe
+mcp-webcoder
+mcp-webcoder-gui
+devspace
+devspace-gui
+
+# Build output
+build/
+
+# Runtime config/state (user-specific)
+.webcoder/
+.webcoder-state/
+.devspace/
+.devspace-state/
+.codex/
+auth.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+Thumbs.db
+.DS_Store
