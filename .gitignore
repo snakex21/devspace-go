@@ -1,9 +1,9 @@
-# Binaries
+# Binaries (only in root)
+/mcp-webcoder
+/mcp-webcoder-gui
+/devspace
+/devspace-gui
 *.exe
-mcp-webcoder
-mcp-webcoder-gui
-devspace
-devspace-gui
 
 # Build output
 build/
