@@ -1,9 +1,9 @@
 // ==UserScript==
-// @name         DevSpace MCP Auto-Approve
-// @namespace    devspace.go
-// @version      1.0
-// @description  Automatycznie klika "Allow" / "Zezwól" dla połączeń MCP w ChatGPT. Koniec z ręcznym potwierdzaniem!
-// @author       DevSpace
+// @name         MCP WebCoder Auto-Approve for ChatGPT
+// @namespace    mcp-webcoder
+// @version      1.1.0
+// @description  Automatycznie klika "Zawsze zezwalaj" / "Połącz" dla MCP WebCoder w ChatGPT.
+// @author       MCP WebCoder
 // @match        https://chatgpt.com/*
 // @match        https://chat.openai.com/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=chatgpt.com
@@ -11,176 +11,263 @@
 // @run-at       document-end
 // ==/UserScript==
 
-(function() {
+(function () {
     'use strict';
 
-    const LOG_PREFIX = '[DevSpace Auto-Approve]';
-    let approvedMcpUrls = new Set();
-    let processedDialogs = new WeakSet();
+    const LOG_PREFIX = '[MCP WebCoder Auto-Approve]';
+    const CLICK_DELAY_MS = 180;
+    const SCAN_INTERVAL_MS = 350;
 
-    // Load previously approved URLs from localStorage
-    try {
-        const saved = localStorage.getItem('devspace_approved_mcp_urls');
-        if (saved) {
-            approvedMcpUrls = new Set(JSON.parse(saved));
-            console.log(LOG_PREFIX, 'Loaded', approvedMcpUrls.size, 'pre-approved MCP URLs');
-        }
-    } catch(e) {}
+    const clickedButtons = new WeakSet();
 
-    function saveApprovedUrls() {
-        try {
-            localStorage.setItem('devspace_approved_mcp_urls', JSON.stringify([...approvedMcpUrls]));
-        } catch(e) {}
+    function log(...args) {
+        console.log(LOG_PREFIX, ...args);
     }
 
-    // --- Find and click buttons by text ---
-    function findButton(texts) {
-        const all = document.querySelectorAll('button, [role="button"], a.btn, .btn');
-        for (const el of all) {
-            const t = (el.textContent || '').trim().toLowerCase();
-            for (const txt of texts) {
-                if (t.includes(txt.toLowerCase())) {
-                    return el;
+    function norm(s) {
+        return (s || '')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .toLowerCase();
+    }
+
+    function isVisible(el) {
+        if (!el || !(el instanceof Element)) return false;
+        const style = window.getComputedStyle(el);
+        if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return false;
+        const rect = el.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+    }
+
+    function buttonText(btn) {
+        return norm(btn.textContent || btn.getAttribute('aria-label') || btn.getAttribute('title') || '');
+    }
+
+    function buttonScore(btn) {
+        let score = 0;
+        const cls = btn.className || '';
+        if (String(cls).includes('btn-primary')) score += 100;
+        if (String(cls).includes('btn-large')) score += 20;
+        if (btn.matches('button')) score += 10;
+        return score;
+    }
+
+    function allButtons(scope = document) {
+        return [...scope.querySelectorAll('button, [role="button"], a.btn, .btn')]
+            .filter((el) => isVisible(el) && !el.disabled && el.getAttribute('aria-disabled') !== 'true');
+    }
+
+    function findButton(scope, labels, opts = {}) {
+        const normalizedLabels = labels.map(norm);
+        const candidates = [];
+
+        for (const btn of allButtons(scope)) {
+            const text = buttonText(btn);
+            if (!text) continue;
+
+            for (const label of normalizedLabels) {
+                const exact = text === label;
+                const contains = text.includes(label);
+                if ((opts.exactOnly && exact) || (!opts.exactOnly && (exact || contains))) {
+                    candidates.push({ btn, exact, score: buttonScore(btn) + (exact ? 1000 : 0) });
+                    break;
                 }
             }
         }
-        return null;
+
+        candidates.sort((a, b) => b.score - a.score);
+        return candidates[0]?.btn || null;
     }
 
-    // --- Auto-approve MCP connection dialogs ---
-    function approveMcpDialog() {
-        // Check for the MCP connection modal/dialog
-        const dialogs = document.querySelectorAll('[role="dialog"], [role="alertdialog"], .modal, .dialog, [data-testid="mcp-connection-dialog"]');
-        
-        for (const dialog of dialogs) {
-            if (processedDialogs.has(dialog)) continue;
-            
-            const text = (dialog.textContent || '').toLowerCase();
-            
-            // Is this an MCP-related dialog?
-            const isMcpDialog = 
-                text.includes('mcp') ||
-                text.includes('model context protocol') ||
-                text.includes('connect to') ||
-                text.includes('połączenie') ||
-                text.includes('serwer mcp') ||
-                text.includes('custom mcp') ||
-                text.includes('niestandardowe serwery mcp');
-            
-            if (!isMcpDialog) continue;
-
-            console.log(LOG_PREFIX, 'Found MCP dialog, auto-approving...');
-            processedDialogs.add(dialog);
-
-            // Click "I understand and want to continue" checkbox if present
-            const understand = findButton(['understand', 'rozumiem', 'i want to continue', 'chcę kontynuować']);
-            if (understand) {
-                console.log(LOG_PREFIX, 'Clicking "I understand"...');
-                understand.click();
+    function safeClick(btn, reason) {
+        if (!btn || clickedButtons.has(btn)) return false;
+        clickedButtons.add(btn);
+        log('click:', reason, '=>', (btn.textContent || '').trim());
+        setTimeout(() => {
+            try {
+                btn.click();
+            } catch (e) {
+                log('click failed:', e);
             }
+        }, CLICK_DELAY_MS);
+        return true;
+    }
 
-            // Wait a tiny bit then click Approve/Allow/Connect
-            setTimeout(() => {
-                const approve = findButton([
-                    'allow', 'connect', 'approve', 'accept', 'continue',
-                    'zezwól', 'połącz', 'zatwierdź', 'akceptuj', 'kontynuuj',
-                    'add', 'dodaj', 'save', 'zapisz'
-                ]);
-                if (approve && !approve.disabled) {
-                    console.log(LOG_PREFIX, 'Clicking APPROVE!');
-                    approve.click();
-                    
-                    // Try to extract the MCP URL being approved
-                    const urlMatch = text.match(/https?:\/\/[^\s"]+/);
-                    if (urlMatch) {
-                        approvedMcpUrls.add(urlMatch[0]);
-                        saveApprovedUrls();
-                    }
-                }
-            }, 500);
+    function dialogText(el) {
+        return norm(el?.textContent || '');
+    }
+
+    function isMcpPermissionText(text) {
+        return (
+            text.includes('mcp') ||
+            text.includes('model context protocol') ||
+            text.includes('mcp webcoder') ||
+            text.includes('devspace') ||
+            text.includes('zezwolić chatgpt na użycie aplikacji') ||
+            text.includes('let chatgpt use') ||
+            text.includes('without confirmation') ||
+            text.includes('bez potwierdzenia') ||
+            text.includes('workspaceidentifiers') ||
+            text.includes('udostępniane dane') ||
+            text.includes('shared data') ||
+            text.includes('custom mcp') ||
+            text.includes('niestandardowe serwery mcp')
+        );
+    }
+
+    function isConnectText(text) {
+        return (
+            text.includes('connect') ||
+            text.includes('połącz') ||
+            text.includes('authorization') ||
+            text.includes('autoryz') ||
+            text.includes('mcp webcoder') ||
+            text.includes('devspace')
+        );
+    }
+
+    function findRelevantScopes() {
+        const selectors = [
+            '[role="dialog"]',
+            '[role="alertdialog"]',
+            '[data-testid="tool-action-buttons"]',
+            '.modal',
+            '.dialog',
+            'main',
+            'body',
+        ];
+
+        const scopes = [];
+        for (const selector of selectors) {
+            for (const el of document.querySelectorAll(selector)) {
+                if (isVisible(el)) scopes.push(el);
+            }
+        }
+        return scopes;
+    }
+
+    function approveToolPermission(scope, text) {
+        if (!isMcpPermissionText(text)) return false;
+
+        // First ChatGPT tool-use card: prefer persistent permission.
+        const alwaysSecondary = findButton(scope, [
+            'zawsze zezwalaj',
+            'always allow',
+            'always approve',
+            'allow always',
+        ]);
+        if (safeClick(alwaysSecondary, 'always allow / persistent permission')) return true;
+
+        // Fallback if ChatGPT only shows one-time allow.
+        const allowOnce = findButton(scope, [
+            'zezwól tym razem',
+            'allow this time',
+            'allow once',
+            'zezwól',
+            'allow',
+            'approve',
+        ]);
+        if (safeClick(allowOnce, 'allow this time fallback')) return true;
+
+        return false;
+    }
+
+    function approveAlwaysConfirmation(scope, text) {
+        const isConfirm =
+            text.includes('without confirmation') ||
+            text.includes('bez potwierdzenia') ||
+            text.includes("won't ask before") ||
+            text.includes('nie będzie pytać') ||
+            text.includes('elevated risk') ||
+            text.includes('podwyższonym ryzykiem');
+
+        if (!isConfirm) return false;
+
+        const confirm = findButton(scope, [
+            'zawsze zezwalaj',
+            'always allow',
+            'allow always',
+        ]);
+        return safeClick(confirm, 'confirm always allow modal');
+    }
+
+    function clickConnect(scope, text) {
+        if (!isConnectText(text) && !document.querySelector('button.btn-primary')) return false;
+
+        const connect = findButton(scope, [
+            'połącz',
+            'connect',
+            'continue',
+            'kontynuuj',
+            'authorize',
+            'autoryzuj',
+        ]);
+        return safeClick(connect, 'connect / authorize');
+    }
+
+    function scan() {
+        // Most-specific scopes first so modal buttons win over background cards.
+        const scopes = findRelevantScopes();
+        for (const scope of scopes) {
+            const text = dialogText(scope);
+            if (!text) continue;
+
+            if (approveAlwaysConfirmation(scope, text)) return;
+            if (approveToolPermission(scope, text)) return;
+            if (clickConnect(scope, text)) return;
         }
     }
 
-    // --- Auto-handle OAuth redirect (the browser popup) ---
     function handleOAuthPopup() {
-        // Check if we're on the DevSpace authorization page
-        if (window.location.pathname === '/authorize' || 
-            document.title.includes('DevSpace') ||
-            document.title.includes('Authorization')) {
-            
-            console.log(LOG_PREFIX, 'Detected DevSpace OAuth page, auto-submitting...');
-            
-            // Find password field and submit button
-            const passwordField = document.querySelector('input[type="password"]');
-            const submitBtn = findButton(['authorize', 'autoryzuj', 'submit', 'wyślij', 'sign in', 'zaloguj']);
-            
-            if (passwordField && submitBtn) {
-                // If we have a saved password, fill it (optional - user must set this)
-                // For now, just click submit if the field is already filled
-                setTimeout(() => {
-                    if (passwordField.value.length > 0) {
-                        console.log(LOG_PREFIX, 'Password detected, submitting...');
-                        submitBtn.click();
-                    } else {
-                        console.log(LOG_PREFIX, 'Password field empty — fill it manually or save it in the script settings.');
-                    }
-                }, 1000);
-            } else if (submitBtn) {
-                // No password needed (auto-approve mode)
-                setTimeout(() => {
-                    console.log(LOG_PREFIX, 'No password required, submitting...');
-                    submitBtn.click();
-                }, 500);
-            }
+        const title = norm(document.title);
+        const text = norm(document.body?.textContent || '');
+        if (!window.location.pathname.includes('/authorize') && !title.includes('authorization') && !text.includes('authorization')) {
+            return;
         }
+
+        const passwordField = document.querySelector('input[type="password"]');
+        const submitBtn = findButton(document, ['authorize', 'autoryzuj', 'submit', 'wyślij', 'sign in', 'zaloguj', 'connect', 'połącz']);
+
+        if (!submitBtn) return;
+        if (passwordField && passwordField.value.length === 0) return;
+
+        safeClick(submitBtn, 'oauth authorize');
     }
 
-    // --- Main observer ---
-    function startObserver() {
-        // Watch for new dialogs/modals appearing
-        const observer = new MutationObserver(() => {
-            approveMcpDialog();
-            handleOAuthPopup();
-        });
-
-        observer.observe(document.body, {
-            childList: true,
-            subtree: true,
-            attributes: true,
-            attributeFilter: ['class', 'style', 'aria-hidden', 'open']
-        });
-
-        // Also run immediately
-        approveMcpDialog();
-        handleOAuthPopup();
-
-        console.log(LOG_PREFIX, 'Watching for MCP dialogs... ✅');
-    }
-
-    // --- OAuth redirect auto-close ---
-    // When the OAuth popup redirects back, it might leave a blank page.
-    // We detect this and close it.
     function handlePostOAuthBlank() {
-        if (window.location.search.includes('code=') && 
+        if (window.location.search.includes('code=') &&
             (document.body.innerText.trim() === '' || document.body.innerText.length < 100)) {
-            console.log(LOG_PREFIX, 'OAuth callback detected, closing popup...');
+            log('OAuth callback detected, closing popup...');
             window.close();
-            // If window.close() doesn't work (not opened by script), show a message
             setTimeout(() => {
                 document.body.innerHTML = '<h2 style="text-align:center;margin-top:40px;font-family:sans-serif">✅ Authorization complete. You can close this window.</h2>';
             }, 500);
         }
     }
 
-    // --- Start ---
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => {
-            startObserver();
-            handlePostOAuthBlank();
-        });
-    } else {
-        startObserver();
+    function run() {
+        scan();
+        handleOAuthPopup();
         handlePostOAuthBlank();
     }
 
+    function startObserver() {
+        const observer = new MutationObserver(run);
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['class', 'style', 'aria-hidden', 'open', 'disabled', 'aria-expanded'],
+        });
+
+        setInterval(run, SCAN_INTERVAL_MS);
+        run();
+        log('watching for MCP permission dialogs ✅');
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', startObserver);
+    } else {
+        startObserver();
+    }
 })();

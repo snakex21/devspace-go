@@ -1,6 +1,6 @@
-# DevSpace Auto-Approve — Tampermonkey Script
+# MCP WebCoder Auto-Approve — Tampermonkey Script
 
-Automatycznie klika "Zezwól" / "Allow" dla połączeń MCP w ChatGPT.
+Automatycznie klika "Zawsze zezwalaj" / "Allow" / "Połącz" dla połączeń MCP w ChatGPT.
 Koniec z ręcznym potwierdzaniem za każdym razem!
 
 ## Instalacja
@@ -20,9 +20,10 @@ Koniec z ręcznym potwierdzaniem za każdym razem!
 
 | Akcja | Efekt |
 |---|---|
-| Dialog MCP "Connect to..." | Auto-klika "Allow" / "Zezwól" |
-| Checkbox "I understand..." | Auto-zaznacza |
-| Strona OAuth DevSpace | Auto-submituje jeśli hasło już wpisane |
+| Dialog narzędzia MCP | Auto-klika "Zawsze zezwalaj" |
+| Modal bez potwierdzeń | Auto-potwierdza "Zawsze zezwalaj" |
+| Ekran połączenia | Auto-klika "Połącz" |
+| Strona OAuth MCP WebCoder | Auto-submituje jeśli hasło już wpisane |
 | Callback OAuth (pusta strona) | Auto-zamyka okno |
 
 ## Konfiguracja hasła (opcjonalne)
@@ -30,12 +31,12 @@ Koniec z ręcznym potwierdzaniem za każdym razem!
 Jeśli chcesz, żeby skrypt automatycznie wpisywał hasło OAuth:
 
 1. Otwórz skrypt w Tampermonkey
-2. Znajdź linię z komentarzem `// For now, just click submit`
-3. Przed nią dodaj:
+2. Znajdź obsługę `passwordField`
+3. Przed sprawdzeniem pustego hasła dodaj:
 ```js
 passwordField.value = 'twoje-haslo-tutaj';
 ```
 
 ## Wyłączenie
 
-Kliknij Tampermonkey → przełącznik przy "DevSpace MCP Auto-Approve" → OFF.
+Kliknij Tampermonkey → przełącznik przy "MCP WebCoder Auto-Approve for ChatGPT" → OFF.
