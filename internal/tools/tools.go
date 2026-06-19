@@ -158,6 +158,30 @@ type WriteOutput struct {
 	Result string `json:"result" jsonschema:"Write result message."`
 }
 
+// MkdirInput represents a directory creation operation.
+type MkdirInput struct {
+	WorkspaceID string `json:"workspaceId" jsonschema:"Workspace identifier returned by open_workspace."`
+	Path        string `json:"path" jsonschema:"Directory path to create, relative to the workspace root."`
+}
+
+// MkdirOutput represents the output for mkdir.
+type MkdirOutput struct {
+	Result string `json:"result" jsonschema:"Directory creation result message."`
+}
+
+// MoveInput represents a file or directory move/rename operation.
+type MoveInput struct {
+	WorkspaceID string `json:"workspaceId" jsonschema:"Workspace identifier returned by open_workspace."`
+	SourcePath  string `json:"sourcePath" jsonschema:"Existing file or directory path, relative to the workspace root."`
+	TargetPath  string `json:"targetPath" jsonschema:"Destination file or directory path, relative to the workspace root."`
+	Overwrite   bool   `json:"overwrite,omitempty" jsonschema:"Overwrite destination if it already exists. Default false."`
+}
+
+// MoveOutput represents the output for move.
+type MoveOutput struct {
+	Result string `json:"result" jsonschema:"Move result message."`
+}
+
 // WriteFile creates or overwrites a file.
 func WriteFile(ctx context.Context, req *mcp.CallToolRequest, input WriteInput, wsRoot string) (*mcp.CallToolResult, WriteOutput, error) {
 	absPath := filepath.Join(wsRoot, input.Path)
@@ -182,6 +206,73 @@ func WriteFile(ctx context.Context, req *mcp.CallToolRequest, input WriteInput, 
 			&mcp.TextContent{Text: result},
 		},
 	}, WriteOutput{Result: result}, nil
+}
+
+// MakeDirectory creates a directory and all missing parents inside a workspace.
+func MakeDirectory(ctx context.Context, req *mcp.CallToolRequest, input MkdirInput, wsRoot string) (*mcp.CallToolResult, MkdirOutput, error) {
+	absPath := filepath.Join(wsRoot, input.Path)
+	absPath = filepath.Clean(absPath)
+
+	if err := os.MkdirAll(absPath, 0755); err != nil {
+		result := &mcp.CallToolResult{}
+		result.SetError(fmt.Errorf("failed to create directory: %v", err))
+		return result, MkdirOutput{}, nil
+	}
+
+	result := fmt.Sprintf("Created directory %s.", input.Path)
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{&mcp.TextContent{Text: result}},
+	}, MkdirOutput{Result: result}, nil
+}
+
+// MovePath moves or renames a file/directory inside a workspace.
+func MovePath(ctx context.Context, req *mcp.CallToolRequest, input MoveInput, wsRoot string) (*mcp.CallToolResult, MoveOutput, error) {
+	sourceAbs := filepath.Clean(filepath.Join(wsRoot, input.SourcePath))
+	targetAbs := filepath.Clean(filepath.Join(wsRoot, input.TargetPath))
+
+	if _, err := os.Stat(sourceAbs); err != nil {
+		result := &mcp.CallToolResult{}
+		if os.IsNotExist(err) {
+			result.SetError(fmt.Errorf("source not found: %s", input.SourcePath))
+		} else {
+			result.SetError(fmt.Errorf("failed to stat source: %v", err))
+		}
+		return result, MoveOutput{}, nil
+	}
+
+	if _, err := os.Stat(targetAbs); err == nil {
+		if !input.Overwrite {
+			result := &mcp.CallToolResult{}
+			result.SetError(fmt.Errorf("target already exists: %s", input.TargetPath))
+			return result, MoveOutput{}, nil
+		}
+		if err := os.RemoveAll(targetAbs); err != nil {
+			result := &mcp.CallToolResult{}
+			result.SetError(fmt.Errorf("failed to remove existing target: %v", err))
+			return result, MoveOutput{}, nil
+		}
+	} else if !os.IsNotExist(err) {
+		result := &mcp.CallToolResult{}
+		result.SetError(fmt.Errorf("failed to stat target: %v", err))
+		return result, MoveOutput{}, nil
+	}
+
+	if err := os.MkdirAll(filepath.Dir(targetAbs), 0755); err != nil {
+		result := &mcp.CallToolResult{}
+		result.SetError(fmt.Errorf("failed to create target parent directory: %v", err))
+		return result, MoveOutput{}, nil
+	}
+
+	if err := os.Rename(sourceAbs, targetAbs); err != nil {
+		result := &mcp.CallToolResult{}
+		result.SetError(fmt.Errorf("failed to move path: %v", err))
+		return result, MoveOutput{}, nil
+	}
+
+	result := fmt.Sprintf("Moved %s to %s.", input.SourcePath, input.TargetPath)
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{&mcp.TextContent{Text: result}},
+	}, MoveOutput{Result: result}, nil
 }
 
 // EditInput represents an edit operation.

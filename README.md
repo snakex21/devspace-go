@@ -86,12 +86,13 @@ Requires **Go 1.23+** only if building from source.
 Once connected, the AI can open one of your approved project folders as a workspace:
 
 - **Read, write, and edit** files inside the workspace
+- **Create directories and move/rename files** safely inside the workspace
 - **Search code** with regex and inspect directories
 - **Run shell commands** (PowerShell on Windows, bash on Unix)
 - **Discover project instructions** from `AGENTS.md` / `CLAUDE.md`
 - **Auto-configure** with portable `.webcoder/config.json`
 
-8 MCP tools: `open_workspace`, `read`, `write`, `edit`, `grep`, `glob`, `ls`, `bash`
+10 MCP tools: `open_workspace`, `read`, `write`, `mkdir`, `move`, `edit`, `grep`, `glob`, `ls`, `bash`
 
 ---
 
