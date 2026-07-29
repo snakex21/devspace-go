@@ -2,7 +2,7 @@
 
 **Suteikite ChatGPT ir Claude saugią prieigą prie savo vietinio kompiuterio. Paverskite bet kurį MCP serverį savo programavimo partneriu.**
 
-DevSpace yra savarankiškai talpinamas MCP serveris, leidžiantis AI asistentams skaityti, redaguoti, ieškoti ir vykdyti kodą jūsų tikruose vietiniuose projektuose — jūsų failai, jūsų įrankiai, jūsų terminalas — nieko neįkeliant į trečiųjų šalių serverius. Jūs paleidžiate jį savo kompiuteryje, atveriate per jūsų valdomą tunelį ir pasirinktinai apsaugote slaptažodžiu.
+DevSpace yra savarankiškai talpinamas MCP serveris, leidžiantis AI asistentams skaityti, redaguoti, ieškoti ir vykdyti kodą jūsų tikruose vietiniuose projektuose — jūsų failai, jūsų įrankiai, jūsų terminalas — nieko neįkeliant į trečiųjų šalių serverius. Jūs paleidžiate jį savo kompiuteryje.
 
 ---
 
@@ -101,8 +101,7 @@ Visa konfigūracija yra **tame pačiame kataloge kaip ir vykdomasis failas** (ne
 
 ```
 .devspace/
-├── config.json       ← leidžiami šakniniai katalogai, prievadas, apvalkalas, kalba, autentifikacija
-└── auth.json         ← savininko slaptažodis (neprivaloma)
+└── config.json       ← leidžiami šakniniai katalogai, prievadas, apvalkalas, kalba
 ```
 
 ### config.json
@@ -157,8 +156,6 @@ Nustatykite `"shell"` config.json arba pasirinkite GUI.
 
 ## Saugumas
 
-- **OAuth 2.0 su PKCE** — jei nustatytas savininko slaptažodis
-- **Režimas be slaptažodžio** — jei slaptažodis nesukonfigūruotas, veikia be autentifikacijos
 - **Kelio apribojimas** — visos failų operacijos tikrinamos pagal leidžiamus šakninius katalogus
 - **Pasirenkamas tunelis** — Cloudflare tunelis apsaugo nuo tiesioginio poveikio
 - **Jokių įkėlimų į trečiųjų šalių serverius** — jūsų kodas niekada nepalieka jūsų kompiuterio
@@ -204,7 +201,6 @@ devspace-go/
 │   ├── devspace/           ← CLI + MCP serveris
 │   └── devspace-gui/       ← Darbalaukio GUI konfigūratorius (Fyne)
 ├── internal/
-│   ├── auth/               ← OAuth 2.0 + PKCE teikėjas
 │   ├── config/             ← Nešiojama konfigūracijos sistema
 │   ├── locales/            ← Vertimai į 47 kalbas
 │   ├── logger/             ← Struktūrizuotas registravimas (zerolog)

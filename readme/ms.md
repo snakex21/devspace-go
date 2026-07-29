@@ -2,7 +2,7 @@
 
 **Berikan ChatGPT & Claude akses selamat ke mesin tempatan anda. Jadikan mana-mana hos MCP sebagai rakan pengekodan anda.**
 
-DevSpace ialah pelayan MCP yang dihos sendiri yang membolehkan pembantu AI membaca, mengedit, mencari dan menjalankan kod dalam projek tempatan sebenar anda — fail anda, alatan anda, terminal anda — tanpa memuat naik apa-apa kepada pihak ketiga. Anda jalankannya pada mesin anda, dedahkannya melalui terowong yang anda kawal, dan secara pilihan melindunginya dengan kata laluan.
+DevSpace ialah pelayan MCP yang dihos sendiri yang membolehkan pembantu AI membaca, mengedit, mencari dan menjalankan kod dalam projek tempatan sebenar anda — fail anda, alatan anda, terminal anda — tanpa memuat naik apa-apa kepada pihak ketiga. Anda jalankannya pada mesin anda, dedahkannya melalui terowong yang anda kawal.
 
 ---
 
@@ -101,8 +101,7 @@ Semua konfigurasi berada **dalam folder yang sama dengan fail boleh laku** (muda
 
 ```
 .devspace/
-├── config.json       ← root dibenarkan, port, shell, bahasa, pengesahan
-└── auth.json         ← kata laluan pemilik (pilihan)
+└── config.json       ← root dibenarkan, port, shell, bahasa
 ```
 
 ### config.json
@@ -157,8 +156,6 @@ Tetapkan `"shell"` dalam config.json atau pilih dalam GUI.
 
 ## Keselamatan
 
-- **OAuth 2.0 dengan PKCE** — jika kata laluan pemilik ditetapkan
-- **Mod tanpa kata laluan** — jika tiada kata laluan dikonfigurasi, berjalan tanpa pengesahan
 - **Sekatan laluan** — semua operasi fail disahkan terhadap root yang dibenarkan
 - **Terowong pilihan** — Terowong Cloudflare melindungi dari pendedahan langsung
 - **Tiada muat naik pihak ketiga** — kod anda tidak pernah meninggalkan mesin anda
@@ -204,7 +201,6 @@ devspace-go/
 │   ├── devspace/           ← CLI + pelayan MCP
 │   └── devspace-gui/       ← Konfigurator GUI desktop (Fyne)
 ├── internal/
-│   ├── auth/               ← Pembekal OAuth 2.0 + PKCE
 │   ├── config/             ← Sistem konfigurasi mudah alih
 │   ├── locales/            ← Terjemahan 47 bahasa
 │   ├── logger/             ← Pengelogan berstruktur (zerolog)

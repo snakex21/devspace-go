@@ -54,15 +54,6 @@ const (
 	LogText LogFormat = "text"
 )
 
-// OAuthConfig holds OAuth-related configuration.
-type OAuthConfig struct {
-	OwnerToken             string   `json:"ownerToken"`
-	AccessTokenTTLSeconds  int      `json:"accessTokenTTLSeconds"`
-	RefreshTokenTTLSeconds int      `json:"refreshTokenTTLSeconds"`
-	Scopes                 []string `json:"scopes"`
-	AllowedRedirectHosts   []string `json:"allowedRedirectHosts"`
-}
-
 // LoggingConfig holds logging configuration.
 type LoggingConfig struct {
 	Level         LogLevel  `json:"level"`
@@ -92,7 +83,6 @@ type Config struct {
 	SkillsEnabled bool          `json:"skillsEnabled"`
 	SkillPaths    []string      `json:"skillPaths"`
 	AllowedHosts  []string      `json:"allowedHosts"`
-	OAuth         OAuthConfig   `json:"oauth"`
 	Logging       LoggingConfig `json:"logging"`
 }
 
@@ -117,12 +107,6 @@ func DefaultConfig() *Config {
 		Widgets:       WidgetFull,
 		SkillsEnabled: true,
 		AllowedHosts:  []string{"*"},
-		OAuth: OAuthConfig{
-			AccessTokenTTLSeconds:  3600,
-			RefreshTokenTTLSeconds: 2592000,
-			Scopes:                 []string{"webcoder"},
-			AllowedRedirectHosts:   []string{"chatgpt.com", "localhost", "127.0.0.1"},
-		},
 		Logging: LoggingConfig{
 			Level:         LogInfo,
 			Format:        LogJSON,
@@ -195,23 +179,6 @@ func LoadConfig() *Config {
 	}
 	if v := os.Getenv("WEBCODER_ALLOWED_HOSTS"); v != "" {
 		cfg.AllowedHosts = splitAndTrim(v, ",")
-	}
-
-	// OAuth config
-	if v := os.Getenv("WEBCODER_OAUTH_OWNER_TOKEN"); v != "" {
-		cfg.OAuth.OwnerToken = v
-	}
-	if v := os.Getenv("WEBCODER_OAUTH_ACCESS_TOKEN_TTL_SECONDS"); v != "" {
-		fmt.Sscanf(v, "%d", &cfg.OAuth.AccessTokenTTLSeconds)
-	}
-	if v := os.Getenv("WEBCODER_OAUTH_REFRESH_TOKEN_TTL_SECONDS"); v != "" {
-		fmt.Sscanf(v, "%d", &cfg.OAuth.RefreshTokenTTLSeconds)
-	}
-	if v := os.Getenv("WEBCODER_OAUTH_SCOPES"); v != "" {
-		cfg.OAuth.Scopes = splitAndTrim(v, ",")
-	}
-	if v := os.Getenv("WEBCODER_OAUTH_ALLOWED_REDIRECT_HOSTS"); v != "" {
-		cfg.OAuth.AllowedRedirectHosts = splitAndTrim(v, ",")
 	}
 
 	// Logging config
@@ -301,21 +268,6 @@ func LoadConfig() *Config {
 			if _, ok := raw["skillsEnabled"]; ok {
 				cfg.SkillsEnabled = fileConfig.SkillsEnabled
 			}
-			if fileConfig.OAuth.OwnerToken != "" {
-				cfg.OAuth.OwnerToken = fileConfig.OAuth.OwnerToken
-			}
-			if fileConfig.OAuth.AccessTokenTTLSeconds != 0 {
-				cfg.OAuth.AccessTokenTTLSeconds = fileConfig.OAuth.AccessTokenTTLSeconds
-			}
-			if fileConfig.OAuth.RefreshTokenTTLSeconds != 0 {
-				cfg.OAuth.RefreshTokenTTLSeconds = fileConfig.OAuth.RefreshTokenTTLSeconds
-			}
-			if len(fileConfig.OAuth.Scopes) > 0 {
-				cfg.OAuth.Scopes = fileConfig.OAuth.Scopes
-			}
-			if len(fileConfig.OAuth.AllowedRedirectHosts) > 0 {
-				cfg.OAuth.AllowedRedirectHosts = fileConfig.OAuth.AllowedRedirectHosts
-			}
 			if fileConfig.Logging.Level != "" {
 				cfg.Logging.Level = fileConfig.Logging.Level
 			}
@@ -340,26 +292,6 @@ func LoadConfig() *Config {
 				if _, ok := loggingRaw["trustProxy"]; ok {
 					cfg.Logging.TrustProxy = fileConfig.Logging.TrustProxy
 				}
-			}
-		}
-	}
-
-	// Check for owner password (new path first, old path as migration fallback)
-	if cfg.OAuth.OwnerToken == "" {
-		authFile := filepath.Join(cfg.ConfigDir, "auth.json")
-		if _, err := os.Stat(authFile); os.IsNotExist(err) {
-			oldAuthFile := filepath.Join(filepath.Dir(cfg.ConfigDir), ".devspace", "auth.json")
-			if _, err := os.Stat(oldAuthFile); err == nil {
-				authFile = oldAuthFile
-			}
-		}
-		if data, err := os.ReadFile(authFile); err == nil {
-			data = stripBOM(data)
-			var auth struct {
-				OwnerToken string `json:"ownerToken"`
-			}
-			if err := json.Unmarshal(data, &auth); err == nil && auth.OwnerToken != "" {
-				cfg.OAuth.OwnerToken = auth.OwnerToken
 			}
 		}
 	}

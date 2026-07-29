@@ -2,7 +2,7 @@
 
 **Adjon biztonságos hozzáférést a ChatGPT-nek és a Claude-nak a helyi gépéhez. Alakítson bármilyen MCP hosztot a kódolási partnerévé.**
 
-A DevSpace egy önállóan üzemeltetett MCP szerver, amely lehetővé teszi az AI asszisztensek számára, hogy fájlokat olvassanak, szerkesszenek, keressenek és kódot futtassanak a valódi helyi projektjeiben — a fájljai, az eszközei, a terminálja — anélkül, hogy bármit feltöltene egy harmadik félhez. Ön futtatja a saját gépén, egy ön által vezérelt alagúton keresztül teszi elérhetővé, és opcionálisan jelszóval védi.
+A DevSpace egy önállóan üzemeltetett MCP szerver, amely lehetővé teszi az AI asszisztensek számára, hogy fájlokat olvassanak, szerkesszenek, keressenek és kódot futtassanak a valódi helyi projektjeiben — a fájljai, az eszközei, a terminálja — anélkül, hogy bármit feltöltene egy harmadik félhez. Ön futtatja a saját gépén, egy ön által vezérelt alagúton keresztül teszi elérhetővé.
 
 ---
 
@@ -101,8 +101,7 @@ Minden konfiguráció **a futtatható fájllal azonos mappában** található (h
 
 ```
 .devspace/
-├── config.json       ← engedélyezett gyökerek, port, shell, nyelv, hitelesítés
-└── auth.json         ← tulajdonosi jelszó (opcionális)
+└── config.json       ← engedélyezett gyökerek, port, shell, nyelv
 ```
 
 ### config.json
@@ -151,14 +150,12 @@ A szerver automatikusan felismeri, melyik érhető el. Indítsa újra a szervert
 | **Linux** | bash | `sh` / bármely shell |
 | **macOS** | bash | `sh` / `zsh` |
 
-Állítsa be a `"shell"` értéket a config.json-ban, vagy válassza ki a GUI-ban.
+Állítsa be a `"shell"` értéket a config.json-ban
 
 ---
 
 ## Biztonság
 
-- **OAuth 2.0 PKCE-vel** — ha a tulajdonosi jelszó be van állítva
-- **Jelszó nélküli mód** — ha nincs jelszó konfigurálva, hitelesítés nélkül fut
 - **Útvonal-korlátozás** — minden fájlművelet ellenőrzése az engedélyezett gyökerek alapján
 - **Opcionális alagút** — a Cloudflare alagút véd a közvetlen kitettségtől
 - **Nincs harmadik félnek történő feltöltés** — a kódja soha nem hagyja el a gépét
@@ -204,7 +201,6 @@ devspace-go/
 │   ├── devspace/           ← CLI + MCP szerver
 │   └── devspace-gui/       ← Asztali GUI konfigurátor (Fyne)
 ├── internal/
-│   ├── auth/               ← OAuth 2.0 + PKCE szolgáltató
 │   ├── config/             ← Hordozható konfigurációs rendszer
 │   ├── locales/            ← 47 nyelvű fordítások
 │   ├── logger/             ← Strukturált naplózás (zerolog)

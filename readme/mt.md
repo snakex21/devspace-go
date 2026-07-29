@@ -2,7 +2,7 @@
 
 **Agħti lil ChatGPT u Claude aċċess sigur għall-magna lokali tiegħek. Ibbiddel kwalunkwe host MCP fis-sieħeb tal-kodifikazzjoni tiegħek.**
 
-DevSpace huwa server MCP li jospita lilek innifsek li jippermetti lill-assistenti tal-AI jaqraw, jeditjaw, ifittxu u jmexxu kodiċi fil-proġetti lokali reali tiegħek — il-fajls tiegħek, l-għodod tiegħek, it-terminal tiegħek — mingħajr ma ttella' xejn lil parti terza. Tħaddmu fuq il-magna tiegħek, tesponih permezz ta' mina li tikkontrolla, u b'mod fakultattiv tassigurah b'password.
+DevSpace huwa server MCP li jospita lilek innifsek li jippermetti lill-assistenti tal-AI jaqraw, jeditjaw, ifittxu u jmexxu kodiċi fil-proġetti lokali reali tiegħek — il-fajls tiegħek, l-għodod tiegħek, it-terminal tiegħek — mingħajr ma ttella' xejn lil parti terza. Tħaddmu fuq il-magna tiegħek, tesponih permezz ta' mina li tikkontrolla.
 
 ---
 
@@ -101,8 +101,7 @@ Il-konfigurazzjoni kollha tinsab **fl-istess folder bħall-eżegwibbli** (portab
 
 ```
 .devspace/
-├── config.json       ← għeruq permessi, port, shell, lingwa, awtentikazzjoni
-└── auth.json         ← password tas-sid (fakultattiv)
+└── config.json       ← għeruq permessi, port, shell, lingwa
 ```
 
 ### config.json
@@ -157,8 +156,6 @@ Issettja `"shell"` f'config.json jew agħżel fil-GUI.
 
 ## Sigurtà
 
-- **OAuth 2.0 ma' PKCE** — jekk il-password tas-sid hija ssettjata
-- **Modalità mingħajr password** — jekk l-ebda password mhija kkonfigurata, jaħdem mingħajr awtentikazzjoni
 - **Konteniment tal-passaġġ** — l-operazzjonijiet kollha tal-fajls huma vvalidati kontra l-għeruq permessi
 - **Mina fakultattiva** — Il-Mina Cloudflare tipproteġi minn espożizzjoni diretta
 - **Ebda uploads lil partijiet terzi** — il-kodiċi tiegħek qatt ma jitlaq il-magna tiegħek
@@ -204,7 +201,6 @@ devspace-go/
 │   ├── devspace/           ← CLI + server MCP
 │   └── devspace-gui/       ← Konfiguratur GUI tad-desktop (Fyne)
 ├── internal/
-│   ├── auth/               ← Fornitur OAuth 2.0 + PKCE
 │   ├── config/             ← Sistema ta' konfigurazzjoni portabbli
 │   ├── locales/            ← Traduzzjonijiet f'47 lingwa
 │   ├── logger/             ← Logging strutturat (zerolog)

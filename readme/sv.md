@@ -2,7 +2,7 @@
 
 **Ge ChatGPT och Claude säker åtkomst till din lokala dator. Förvandla vilken MCP-värd som helst till din kodningspartner.**
 
-DevSpace är en självhostad MCP-server som låter AI-assistenter läsa, redigera, söka och köra kod i dina riktiga lokala projekt — dina filer, dina verktyg, din terminal — utan att ladda upp något till tredje part. Du kör den på din dator, exponerar den genom en tunnel du kontrollerar och skyddar den eventuellt med ett lösenord.
+DevSpace är en självhostad MCP-server som låter AI-assistenter läsa, redigera, söka och köra kod i dina riktiga lokala projekt — dina filer, dina verktyg, din terminal — utan att ladda upp något till tredje part. Du kör den på din dator.
 
 ---
 
@@ -101,8 +101,7 @@ All konfiguration finns **i samma mapp som den körbara filen** (portabel):
 
 ```
 .devspace/
-├── config.json       ← tillåtna rötter, port, skal, språk, autentisering
-└── auth.json         ← ägarlösenord (valfritt)
+└── config.json       ← tillåtna rötter, port, skal, språk
 ```
 
 ### config.json
@@ -157,8 +156,6 @@ Ställ in `"shell"` i config.json eller välj i GUI:t.
 
 ## Säkerhet
 
-- **OAuth 2.0 med PKCE** — om ägarlösenord är inställt
-- **Lösenordslöst läge** — om inget lösenord är konfigurerat körs det utan autentisering
 - **Sökvägsbegränsning** — alla filoperationer valideras mot tillåtna rötter
 - **Valfri tunnel** — Cloudflare-tunnel skyddar mot direkt exponering
 - **Inga uppladdningar till tredje part** — din kod lämnar aldrig din dator
@@ -204,7 +201,6 @@ devspace-go/
 │   ├── devspace/           ← CLI + MCP-server
 │   └── devspace-gui/       ← Skrivbordskonfigurator GUI (Fyne)
 ├── internal/
-│   ├── auth/               ← OAuth 2.0 + PKCE-leverantör
 │   ├── config/             ← Portabelt konfigurationssystem
 │   ├── locales/            ← Översättningar till 47 språk
 │   ├── logger/             ← Strukturerad loggning (zerolog)

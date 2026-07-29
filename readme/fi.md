@@ -2,7 +2,7 @@
 
 **Anna ChatGPT:lle & Claudelle turvallinen pääsy paikalliselle koneellesi. Muuta mikä tahansa MCP-isäntä koodauskumppaniksesi.**
 
-DevSpace on itseisännöity MCP-palvelin, joka antaa tekoälyavustajien lukea, muokata, etsiä ja suorittaa koodia oikeissa paikallisissa projekteissasi — tiedostosi, työkalusi, päätteesi — lataamatta mitään kolmannelle osapuolelle. Suoritat sen koneellasi, paljastat sen hallitsemasi tunnelin kautta ja valinnaisesti suojaat sen salasanalla.
+DevSpace on itseisännöity MCP-palvelin, joka antaa tekoälyavustajien lukea, muokata, etsiä ja suorittaa koodia oikeissa paikallisissa projekteissasi — tiedostosi, työkalusi, päätteesi — lataamatta mitään kolmannelle osapuolelle. Suoritat sen koneellasi.
 
 ---
 
@@ -101,8 +101,7 @@ Kaikki määritykset sijaitsevat **samassa kansiossa kuin suoritettava tiedosto*
 
 ```
 .devspace/
-├── config.json       ← sallitut juuret, portti, komentotulkki, kieli, todennus
-└── auth.json         ← omistajan salasana (valinnainen)
+└── config.json       ← sallitut juuret, portti, komentotulkki, kieli
 ```
 
 ### config.json
@@ -157,8 +156,6 @@ Aseta `"shell"` config.json-tiedostossa tai valitse GUI:ssa.
 
 ## Tietoturva
 
-- **OAuth 2.0 PKCE:lla** — jos omistajan salasana on asetettu
-- **Salasanaton tila** — jos salasanaa ei ole määritetty, toimii ilman todennusta
 - **Polun rajoittaminen** — kaikki tiedosto-operaatiot validoidaan sallittuja juuria vasten
 - **Valinnainen tunneli** — Cloudflare-tunneli suojaa suoralta altistumiselta
 - **Ei kolmannen osapuolen latauksia** — koodisi ei koskaan poistu koneeltasi
@@ -204,7 +201,6 @@ devspace-go/
 │   ├── devspace/           ← CLI + MCP-palvelin
 │   └── devspace-gui/       ← Työpöydän GUI-määritin (Fyne)
 ├── internal/
-│   ├── auth/               ← OAuth 2.0 + PKCE -tarjoaja
 │   ├── config/             ← Kannettava määritysjärjestelmä
 │   ├── locales/            ← 47 kielen käännökset
 │   ├── logger/             ← Jäsennelty lokitus (zerolog)

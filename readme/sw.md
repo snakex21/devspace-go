@@ -2,7 +2,7 @@
 
 **Wape ChatGPT na Claude ufikiaji salama kwa mashine yako ya ndani. Geuza seva yoyote ya MCP kuwa mshirika wako wa usimbaji.**
 
-DevSpace ni seva ya MCP inayojiendesha yenyewe inayoruhusu wasaidizi wa AI kusoma, kuhariri, kutafuta, na kuendesha msimbo katika miradi yako halisi ya ndani — faili zako, zana zako, terminal yako — bila kupakia chochote kwa mhusika wa tatu. Unaiendesha kwenye mashine yako, unaitoa kupitia handaki unayodhibiti, na kwa hiari unailinda kwa nenosiri.
+DevSpace ni seva ya MCP inayojiendesha yenyewe inayoruhusu wasaidizi wa AI kusoma, kuhariri, kutafuta, na kuendesha msimbo katika miradi yako halisi ya ndani — faili zako, zana zako, terminal yako — bila kupakia chochote kwa mhusika wa tatu. Unaiendesha kwenye mashine yako, unaitoa kupitia handaki unayodhibiti.
 
 ---
 
@@ -101,8 +101,7 @@ Usanidi wote upo **kwenye folda sawa na faili inayotekelezeka** (inayobebeka):
 
 ```
 .devspace/
-├── config.json       ← mizizi inayoruhusiwa, mlango, shell, lugha, uthibitisho
-└── auth.json         ← nenosiri la mmiliki (si lazima)
+└── config.json       ← mizizi inayoruhusiwa, mlango, shell, lugha
 ```
 
 ### config.json
@@ -157,8 +156,6 @@ Weka `"shell"` kwenye config.json au chagua kwenye GUI.
 
 ## Usalama
 
-- **OAuth 2.0 na PKCE** — ikiwa nenosiri la mmiliki limewekwa
-- **Hali bila nenosiri** — ikiwa hakuna nenosiri lililosanidiwa, inaendesha bila uthibitisho
 - **Uzuiaji wa njia** — shughuli zote za faili zinathibitishwa dhidi ya mizizi inayoruhusiwa
 - **Handaki ya hiari** — Handaki ya Cloudflare inalinda dhidi ya mfichuo wa moja kwa moja
 - **Hakuna upakiaji kwa wahusika wengine** — msimbo wako hauachi mashine yako kamwe
@@ -204,7 +201,6 @@ devspace-go/
 │   ├── devspace/           ← CLI + seva ya MCP
 │   └── devspace-gui/       ← Kisanidi cha desktop GUI (Fyne)
 ├── internal/
-│   ├── auth/               ← Mtoa huduma wa OAuth 2.0 + PKCE
 │   ├── config/             ← Mfumo wa usanidi unaobebeka
 │   ├── locales/            ← Tafsiri za lugha 47
 │   ├── logger/             ← Uwekaji kumbukumbu uliopangwa (zerolog)

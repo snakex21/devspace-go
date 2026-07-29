@@ -2,7 +2,7 @@
 
 **Give ChatGPT & Claude secure access to your local machine. Turn any MCP host into your coding partner.**
 
-DevSpace is a self-hosted MCP server that lets AI assistants read, edit, search, and run code in your real local projects — your files, your tools, your terminal — without uploading anything to a third party. You run it on your machine, expose it through a tunnel you control, and optionally secure it with a password.
+DevSpace is a self-hosted MCP server that lets AI assistants read, edit, search, and run code in your real local projects — your files, your tools, your terminal — without uploading anything to a third party. You run it on your machine and expose it through a tunnel you control.
 
 ---
 
@@ -101,8 +101,7 @@ All config lives **in the same folder as the executable** (portable):
 
 ```
 .devspace/
-├── config.json       ← allowed roots, port, shell, language, auth
-└── auth.json         ← owner password (optional)
+└── config.json       ← allowed roots, port, shell, language
 ```
 
 ### config.json
@@ -157,10 +156,9 @@ Set `"shell"` in config.json or choose in the GUI.
 
 ## Security
 
-- **OAuth 2.0 with PKCE** — if owner password is set
-- **Password-less mode** — if no password configured, runs without auth
+- **No built-in authentication** — anyone with the public tunnel URL can use the server
 - **Path containment** — all file ops validated against allowed roots
-- **Optional tunnel** — Cloudflare Tunnel protects from direct exposure
+- **Tunnel access** — treat the public tunnel URL as a secret and stop the server when it is not in use
 - **No third-party uploads** — your code never leaves your machine
 
 ---
@@ -204,7 +202,6 @@ devspace-go/
 │   ├── devspace/           ← CLI + MCP server
 │   └── devspace-gui/       ← Desktop GUI configurator (Fyne)
 ├── internal/
-│   ├── auth/               ← OAuth 2.0 + PKCE provider
 │   ├── config/             ← Portable config system
 │   ├── locales/            ← 47 language translations
 │   ├── logger/             ← Structured logging (zerolog)

@@ -2,7 +2,7 @@
 
 **Geben Sie ChatGPT & Claude sicheren Zugriff auf Ihren lokalen Rechner. Machen Sie jeden MCP-Host zu Ihrem Coding-Partner.**
 
-DevSpace ist ein selbst gehosteter MCP-Server, der KI-Assistenten erlaubt, Code in Ihren echten lokalen Projekten zu lesen, zu bearbeiten, zu durchsuchen und auszuführen — Ihre Dateien, Ihre Werkzeuge, Ihr Terminal — ohne etwas an Dritte hochzuladen. Sie führen ihn auf Ihrem Rechner aus, stellen ihn über einen von Ihnen kontrollierten Tunnel bereit und sichern ihn optional mit einem Passwort.
+DevSpace ist ein selbst gehosteter MCP-Server, der KI-Assistenten erlaubt, Code in Ihren echten lokalen Projekten zu lesen, zu bearbeiten, zu durchsuchen und auszuführen — Ihre Dateien, Ihre Werkzeuge, Ihr Terminal — ohne etwas an Dritte hochzuladen. Sie führen ihn auf Ihrem Rechner aus.
 
 ---
 
@@ -101,8 +101,7 @@ Die gesamte Konfiguration befindet sich **im selben Ordner wie die ausführbare 
 
 ```
 .devspace/
-├── config.json       ← erlaubte Wurzeln, Port, Shell, Sprache, Authentifizierung
-└── auth.json         ← Besitzer-Passwort (optional)
+└── config.json       ← erlaubte Wurzeln, Port, Shell, Sprache
 ```
 
 ### config.json
@@ -157,8 +156,6 @@ Setzen Sie `"shell"` in config.json oder wählen Sie in der GUI.
 
 ## Sicherheit
 
-- **OAuth 2.0 mit PKCE** — wenn ein Besitzer-Passwort gesetzt ist
-- **Passwortloser Modus** — wenn kein Passwort konfiguriert ist, läuft ohne Authentifizierung
 - **Pfadbegrenzung** — alle Dateioperationen werden gegen erlaubte Wurzeln validiert
 - **Optionaler Tunnel** — Cloudflare-Tunnel schützt vor direkter Offenlegung
 - **Keine Drittanbieter-Uploads** — Ihr Code verlässt niemals Ihren Rechner
@@ -204,7 +201,6 @@ devspace-go/
 │   ├── devspace/           ← CLI + MCP-Server
 │   └── devspace-gui/       ← Desktop-GUI-Konfigurator (Fyne)
 ├── internal/
-│   ├── auth/               ← OAuth 2.0 + PKCE-Anbieter
 │   ├── config/             ← Portables Konfigurationssystem
 │   ├── locales/            ← 47 Sprachübersetzungen
 │   ├── logger/             ← Strukturiertes Logging (zerolog)

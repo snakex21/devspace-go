@@ -16,8 +16,8 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 
-	devconfig "github.com/waishnav/mcp-webcoder/internal/config"
-	"github.com/waishnav/mcp-webcoder/internal/locales"
+	devconfig "github.com/snakex21/devspace-go/internal/config"
+	"github.com/snakex21/devspace-go/internal/locales"
 )
 
 // --- All available languages ---
@@ -33,23 +33,21 @@ var shellOptions = []string{"auto", "powershell", "cmd", "bash", "sh"}
 
 // guiWidgets holds references to all translatable widgets.
 type guiWidgets struct {
-	window       fyne.Window
-	titleLabel   *widget.Label
-	hostEntry    *widget.Entry
-	portEntry    *widget.Entry
-	rootsEntry   *widget.Entry
-	urlEntry     *widget.Entry
-	shellSelect  *widget.Select
-	langSelect   *widget.Select
-	passEntry    *widget.Entry
-	confirmEntry *widget.Entry
-	browseBtn    *widget.Button
-	saveBtn      *widget.Button
-	testBtn      *widget.Button
-	statusLabel  *widget.Label
-	progressBar  *widget.ProgressBarInfinite
-	cfg          *devconfig.Config
-	formLabels   []*widget.Label // labels inside the form we track
+	window      fyne.Window
+	titleLabel  *widget.Label
+	hostEntry   *widget.Entry
+	portEntry   *widget.Entry
+	rootsEntry  *widget.Entry
+	urlEntry    *widget.Entry
+	shellSelect *widget.Select
+	langSelect  *widget.Select
+	browseBtn   *widget.Button
+	saveBtn     *widget.Button
+	testBtn     *widget.Button
+	statusLabel *widget.Label
+	progressBar *widget.ProgressBarInfinite
+	cfg         *devconfig.Config
+	formLabels  []*widget.Label // labels inside the form we track
 }
 
 // applyLang updates all widget texts to the currently active locale.
@@ -71,19 +69,6 @@ func (gw *guiWidgets) applyLang() {
 	// Update placeholders
 	gw.rootsEntry.SetPlaceHolder(locales.T("gui.roots_placeholder"))
 	gw.urlEntry.SetPlaceHolder(locales.T("gui.url_placeholder"))
-	gw.passEntry.SetPlaceHolder(locales.T("gui.password_placeholder"))
-	gw.confirmEntry.SetPlaceHolder(locales.T("gui.confirm_placeholder"))
-
-	// Update password validator message
-	gw.passEntry.Validator = func(s string) error {
-		if s == "" {
-			return nil
-		}
-		if len(s) < 16 {
-			return errors.New(locales.T("gui.password_empty_ok"))
-		}
-		return nil
-	}
 	gw.portEntry.Validator = func(s string) error {
 		var p int
 		if _, err := fmt.Sscanf(s, "%d", &p); err != nil || p < 1 || p > 65535 {
@@ -104,8 +89,6 @@ func (gw *guiWidgets) rebuildForm() {
 	form.Append(locales.T("gui.url"), gw.urlEntry)
 	form.Append(locales.T("gui.shell"), gw.shellSelect)
 	form.Append(locales.T("gui.lang"), gw.langSelect)
-	form.Append(locales.T("gui.password"), gw.passEntry)
-	form.Append(locales.T("gui.confirm"), gw.confirmEntry)
 
 	buttons := container.NewHBox(
 		layout.NewSpacer(),
@@ -203,21 +186,6 @@ func runGUI() {
 		langSelect.SetSelected(cfg.Lang)
 	}
 
-	passEntry := widget.NewPasswordEntry()
-	passEntry.SetPlaceHolder(locales.T("gui.password_placeholder"))
-	passEntry.Validator = func(s string) error {
-		if s == "" {
-			return nil
-		}
-		if len(s) < 16 {
-			return errors.New(locales.T("gui.password_empty_ok"))
-		}
-		return nil
-	}
-
-	confirmEntry := widget.NewPasswordEntry()
-	confirmEntry.SetPlaceHolder(locales.T("gui.confirm_placeholder"))
-
 	statusLabel := widget.NewLabel("")
 	statusLabel.TextStyle = fyne.TextStyle{Bold: true}
 
@@ -226,20 +194,18 @@ func runGUI() {
 
 	// --- Assemble guiWidgets ---
 	gw := &guiWidgets{
-		window:       w,
-		titleLabel:   titleLabel,
-		hostEntry:    hostEntry,
-		portEntry:    portEntry,
-		rootsEntry:   rootsEntry,
-		urlEntry:     urlEntry,
-		shellSelect:  shellSelect,
-		langSelect:   langSelect,
-		passEntry:    passEntry,
-		confirmEntry: confirmEntry,
-		browseBtn:    browseBtn,
-		statusLabel:  statusLabel,
-		progressBar:  progressBar,
-		cfg:          cfg,
+		window:      w,
+		titleLabel:  titleLabel,
+		hostEntry:   hostEntry,
+		portEntry:   portEntry,
+		rootsEntry:  rootsEntry,
+		urlEntry:    urlEntry,
+		shellSelect: shellSelect,
+		langSelect:  langSelect,
+		browseBtn:   browseBtn,
+		statusLabel: statusLabel,
+		progressBar: progressBar,
+		cfg:         cfg,
 	}
 
 	// --- Save button ---
@@ -247,16 +213,6 @@ func runGUI() {
 		if strings.TrimSpace(rootsEntry.Text) == "" {
 			dialog.ShowError(errors.New(locales.T("gui.roots_empty")), w)
 			return
-		}
-		if passEntry.Text != "" && passEntry.Text != confirmEntry.Text {
-			dialog.ShowError(errors.New(locales.T("gui.password_mismatch")), w)
-			return
-		}
-		if passEntry.Text != "" {
-			if err := passEntry.Validate(); err != nil {
-				dialog.ShowError(err, w)
-				return
-			}
 		}
 		if err := portEntry.Validate(); err != nil {
 			dialog.ShowError(err, w)
@@ -269,7 +225,6 @@ func runGUI() {
 		cfg.AllowedRoots = parseRoots(rootsEntry.Text)
 		cfg.Shell = shellSelect.Selected
 		cfg.Lang = langSelect.Selected
-		cfg.OAuth.OwnerToken = passEntry.Text
 
 		if len(cfg.AllowedRoots) == 0 {
 			dialog.ShowError(errors.New(locales.T("gui.roots_parse_error")), w)
@@ -305,13 +260,11 @@ func runGUI() {
 	testBtn := widget.NewButtonWithIcon(locales.T("gui.test"), theme.MediaPlayIcon(), func() {
 		statusLabel.SetText(locales.T("gui.status_checking"))
 		info := fmt.Sprintf(
-			"Host: %s\nPort: %s\nRoots: %s\nURL: %s\n%s: %s\n\n%s: %s\n%s: %s",
+			"Host: %s\nPort: %s\nRoots: %s\nURL: %s\n\n%s: %s\n%s: %s",
 			hostEntry.Text,
 			portEntry.Text,
 			rootsEntry.Text,
 			urlEntry.Text,
-			locales.T("gui.password"),
-			strings.Repeat("*", len(passEntry.Text)),
 			locales.T("gui.shell"),
 			shellSelect.Selected,
 			locales.T("gui.lang"),
@@ -376,21 +329,6 @@ func saveGUIConfig(cfg *devconfig.Config) error {
 	}
 	if err := os.WriteFile(configPath, data, 0600); err != nil {
 		return fmt.Errorf("write config.json: %w", err)
-	}
-
-	// Save or remove auth.json
-	authPath := filepath.Join(cfg.ConfigDir, "auth.json")
-	if cfg.OAuth.OwnerToken != "" {
-		authData := map[string]string{"ownerToken": cfg.OAuth.OwnerToken}
-		authBytes, err := json.MarshalIndent(authData, "", "  ")
-		if err != nil {
-			return fmt.Errorf("marshal auth: %w", err)
-		}
-		if err := os.WriteFile(authPath, authBytes, 0600); err != nil {
-			return fmt.Errorf("write auth.json: %w", err)
-		}
-	} else {
-		os.Remove(authPath)
 	}
 
 	return nil

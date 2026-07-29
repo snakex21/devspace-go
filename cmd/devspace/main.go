@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/waishnav/mcp-webcoder/internal/config"
-	"github.com/waishnav/mcp-webcoder/internal/locales"
-	"github.com/waishnav/mcp-webcoder/internal/server"
+	"github.com/snakex21/devspace-go/internal/config"
+	"github.com/snakex21/devspace-go/internal/locales"
+	"github.com/snakex21/devspace-go/internal/server"
 )
 
 func main() {
@@ -68,10 +68,7 @@ func runServerWithConfig(cfg *config.Config) {
 		locales.Init("pl")
 	}
 
-	// Auto-detect: no auth if no password configured
-	noAuth := cfg.OAuth.OwnerToken == ""
-
-	srv, err := server.New(cfg, noAuth)
+	srv, err := server.New(cfg)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to create server: %v\n", err)
 		os.Exit(1)
@@ -118,17 +115,6 @@ func runInit() {
 		cfg.PublicBaseURL = urlInput
 	}
 
-	// Read owner password
-	fmt.Print("Owner password (min 16 chars): ")
-	var passwordInput string
-	fmt.Scanln(&passwordInput)
-	if len(passwordInput) >= 16 {
-		cfg.OAuth.OwnerToken = passwordInput
-	} else {
-		fmt.Println("Password too short, using default...")
-		cfg.OAuth.OwnerToken = "webcoder-default-owner-token-change-me"
-	}
-
 	// Save config
 	if err := saveConfig(cfg); err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to save config: %v\n", err)
@@ -156,12 +142,6 @@ func runDoctor() {
 		fmt.Printf("[ok] Allowed roots: %s\n", strings.Join(cfg.AllowedRoots, ", "))
 	} else {
 		fmt.Println("[!] No allowed roots configured")
-	}
-
-	if cfg.OAuth.OwnerToken != "" {
-		fmt.Println("[ok] Owner token configured")
-	} else {
-		fmt.Println("[!] No owner token configured")
 	}
 
 	// Check shell availability
@@ -198,7 +178,6 @@ func runConfigShow() {
 	fmt.Printf("Skills:          %v\n", cfg.SkillsEnabled)
 	fmt.Printf("Log Level:       %s\n", cfg.Logging.Level)
 	fmt.Printf("Log Format:      %s\n", cfg.Logging.Format)
-	fmt.Printf("OAuth:           configured=%v\n", cfg.OAuth.OwnerToken != "")
 }
 
 func printHelp() {
@@ -217,12 +196,8 @@ Commands:
 GUI Configurator:
   mcp-webcoder-gui.exe    Desktop configuration window
 
-Jeśli nie ustawisz hasła → serwer działa bez autoryzacji.
-Jeśli ustawisz hasło → wymagane logowanie OAuth.
-
 Environment:
   WEBCODER_ALLOWED_ROOTS       Required. Comma-separated allowed paths.
-  WEBCODER_OAUTH_OWNER_TOKEN   Required. Owner password.
   WEBCODER_PUBLIC_BASE_URL     Public base URL (default: http://127.0.0.1:7676)
   HOST                         Listen host (default: 127.0.0.1)
   PORT                         Listen port (default: 7676)
@@ -255,18 +230,6 @@ func saveConfig(cfg *config.Config) error {
 
 	if err := os.WriteFile(configPath, data, 0600); err != nil {
 		return fmt.Errorf("write config: %w", err)
-	}
-
-	// Save auth token
-	authPath := filepath.Join(cfg.ConfigDir, "auth.json")
-	authData := map[string]string{"ownerToken": cfg.OAuth.OwnerToken}
-	authBytes, err := json.MarshalIndent(authData, "", "  ")
-	if err != nil {
-		return fmt.Errorf("marshal auth: %w", err)
-	}
-
-	if err := os.WriteFile(authPath, authBytes, 0600); err != nil {
-		return fmt.Errorf("write auth: %w", err)
 	}
 
 	fmt.Printf("Configuration saved to %s\n", cfg.ConfigDir)

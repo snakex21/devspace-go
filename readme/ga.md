@@ -2,7 +2,7 @@
 
 **Tabhair rochtain shlán do ChatGPT & Claude ar do mheaisín áitiúil. Déan comhpháirtí códála d'aon óstach MCP.**
 
-Is freastalaí MCP féin-óstáilte é DevSpace a ligeann do chúntóirí AI cód a léamh, a chur in eagar, a chuardach agus a rith i do fhíor-thionscadail áitiúla — do chomhaid, d'uirlisí, do theirminéal — gan aon rud a uaslódáil chuig tríú páirtí. Rithfidh tú é ar do mheaisín, nochtfaidh tú é trí thollán a rialaíonn tú, agus roghnachdaíonn tú é le pasfhocal.
+Is freastalaí MCP féin-óstáilte é DevSpace a ligeann do chúntóirí AI cód a léamh, a chur in eagar, a chuardach agus a rith i do fhíor-thionscadail áitiúla — do chomhaid, d'uirlisí, do theirminéal — gan aon rud a uaslódáil chuig tríú páirtí. Rithfidh tú é ar do mheaisín, nochtfaidh tú é trí thollán a rialaíonn tú.
 
 ---
 
@@ -101,8 +101,7 @@ Tá an chumraíocht ar fad **san fhillteán céanna leis an gcomhad inrite** (in
 
 ```
 .devspace/
-├── config.json       ← fréamhacha ceadaithe, port, blaosc, teanga, fíordheimhniú
-└── auth.json         ← pasfhocal úinéara (roghnach)
+└── config.json       ← fréamhacha ceadaithe, port, blaosc, teanga
 ```
 
 ### config.json
@@ -157,8 +156,6 @@ Socraigh `"shell"` i config.json nó roghnaigh sa GUI.
 
 ## Slándáil
 
-- **OAuth 2.0 le PKCE** — má tá pasfhocal úinéara socraithe
-- **Mód gan phasfhocal** — mura bhfuil pasfhocal cumraithe, ritheann gan fíordheimhniú
 - **Coimeádán conaire** — déantar gach oibríocht comhaid a bhailíochtú i gcoinne fréamhacha ceadaithe
 - **Tollán roghnach** — Cosnaíonn Tollán Cloudflare ar nochtadh díreach
 - **Gan uaslódálacha tríú páirtí** — ní fhágann do chód do mheaisín choíche
@@ -204,7 +201,6 @@ devspace-go/
 │   ├── devspace/           ← CLI + freastalaí MCP
 │   └── devspace-gui/       ← Cumraitheoir deisce GUI (Fyne)
 ├── internal/
-│   ├── auth/               ← Soláthraí OAuth 2.0 + PKCE
 │   ├── config/             ← Córas cumraíochta iniompartha
 │   ├── locales/            ← Aistriúcháin 47 teanga
 │   ├── logger/             ← Logáil struchtúrtha (zerolog)

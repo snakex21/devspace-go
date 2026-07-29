@@ -1,10 +1,9 @@
-module github.com/waishnav/mcp-webcoder
+module github.com/snakex21/devspace-go
 
 go 1.26.2
 
 require (
 	fyne.io/fyne/v2 v2.7.4
-	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0
 	github.com/modelcontextprotocol/go-sdk v1.6.1
 	github.com/rs/zerolog v1.35.1

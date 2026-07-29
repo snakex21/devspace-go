@@ -2,7 +2,7 @@
 
 **Oferă ChatGPT și Claude acces securizat la mașina ta locală. Transformă orice host MCP în partenerul tău de programare.**
 
-DevSpace este un server MCP auto-găzduit care permite asistenților AI să citească, editeze, caute și ruleze cod în proiectele tale locale reale — fișierele tale, uneltele tale, terminalul tău — fără a încărca nimic către o terță parte. Îl rulezi pe mașina ta, îl expui printr-un tunel pe care îl controlezi și, opțional, îl securizezi cu o parolă.
+DevSpace este un server MCP auto-găzduit care permite asistenților AI să citească, editeze, caute și ruleze cod în proiectele tale locale reale — fișierele tale, uneltele tale, terminalul tău — fără a încărca nimic către o terță parte. Îl rulezi pe mașina ta, îl expui printr-un tunel pe care îl controlezi și, opțional.
 
 ---
 
@@ -101,8 +101,7 @@ Toată configurația se află **în același dosar cu executabilul** (portabil):
 
 ```
 .devspace/
-├── config.json       ← rădăcini permise, port, shell, limbă, autentificare
-└── auth.json         ← parola proprietarului (opțional)
+└── config.json       ← rădăcini permise, port, shell, limbă
 ```
 
 ### config.json
@@ -157,8 +156,6 @@ Setează `"shell"` în config.json sau alege în GUI.
 
 ## Securitate
 
-- **OAuth 2.0 cu PKCE** — dacă este setată o parolă de proprietar
-- **Mod fără parolă** — dacă nu este configurată nicio parolă, rulează fără autentificare
 - **Izolare pe căi** — toate operațiile pe fișiere sunt validate față de rădăcinile permise
 - **Tunel opțional** — Tunelul Cloudflare protejează împotriva expunerii directe
 - **Fără încărcări către terți** — codul tău nu părăsește niciodată mașina ta
@@ -204,7 +201,6 @@ devspace-go/
 │   ├── devspace/           ← CLI + server MCP
 │   └── devspace-gui/       ← Configurator GUI desktop (Fyne)
 ├── internal/
-│   ├── auth/               ← Furnizor OAuth 2.0 + PKCE
 │   ├── config/             ← Sistem de configurare portabil
 │   ├── locales/            ← Traduceri în 47 de limbi
 │   ├── logger/             ← Logging structurat (zerolog)

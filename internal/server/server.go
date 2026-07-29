@@ -16,12 +16,11 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/rs/zerolog/log"
-	"github.com/waishnav/mcp-webcoder/internal/auth"
-	"github.com/waishnav/mcp-webcoder/internal/config"
-	"github.com/waishnav/mcp-webcoder/internal/logger"
-	"github.com/waishnav/mcp-webcoder/internal/store"
-	"github.com/waishnav/mcp-webcoder/internal/tools"
-	"github.com/waishnav/mcp-webcoder/internal/workspace"
+	"github.com/snakex21/devspace-go/internal/config"
+	"github.com/snakex21/devspace-go/internal/logger"
+	"github.com/snakex21/devspace-go/internal/store"
+	"github.com/snakex21/devspace-go/internal/tools"
+	"github.com/snakex21/devspace-go/internal/workspace"
 )
 
 // boolPtr returns a pointer to the given bool value (for ToolAnnotations pointer fields).
@@ -31,14 +30,13 @@ func boolPtr(b bool) *bool { return &b }
 type Server struct {
 	cfg        *config.Config
 	httpServer *http.Server
-	provider   *auth.Provider
+	tunnelStop context.CancelFunc
 	registry   *workspace.Registry
 	store      *store.Store
-	noAuth     bool
 }
 
 // New creates a new MCP WebCoder server.
-func New(cfg *config.Config, noAuth bool) (*Server, error) {
+func New(cfg *config.Config) (*Server, error) {
 	logger.Init(string(cfg.Logging.Level), string(cfg.Logging.Format))
 	tools.SetShell(cfg.Shell)
 
@@ -48,14 +46,11 @@ func New(cfg *config.Config, noAuth bool) (*Server, error) {
 	}
 
 	registry := workspace.NewRegistry(cfg, s)
-	provider := auth.NewProvider(cfg)
 
 	return &Server{
 		cfg:      cfg,
-		provider: provider,
 		registry: registry,
 		store:    s,
-		noAuth:   noAuth,
 	}, nil
 }
 
@@ -69,21 +64,10 @@ func (s *Server) Start() error {
 		fmt.Fprintf(w, `{"ok":true,"name":"mcp-webcoder"}`)
 	})
 
-	// OAuth endpoints
-	mux.HandleFunc("/.well-known/oauth-authorization-server", s.provider.HandleOAuthMetadata)
-	mux.HandleFunc("/.well-known/oauth-protected-resource/mcp", s.provider.HandleProtectedResourceMetadata)
-	mux.HandleFunc("/authorize", s.provider.HandleAuthorize)
-	mux.HandleFunc("/token", s.provider.HandleToken)
-	mux.HandleFunc("/revoke", s.provider.HandleRevoke)
-	mux.HandleFunc("/register", s.provider.HandleRegister)
-
-	// MCP endpoint using StreamableHTTPHandler
-	handler := mcp.NewStreamableHTTPHandler(
-		func(r *http.Request) *mcp.Server {
-			return s.createMcpServer()
-		},
-		&mcp.StreamableHTTPOptions{DisableLocalhostProtection: true},
-	)
+	// MCP endpoint using stateless Streamable HTTP. Workspace state is tracked
+	// separately by workspaceId, so transport sessions only add another failure
+	// mode when a proxy or web client drops an Mcp-Session-Id between requests.
+	handler := s.streamableMCPHandler()
 
 	mux.Handle("/mcp", handler)
 
@@ -96,19 +80,9 @@ func (s *Server) Start() error {
 	)
 	mux.Handle("/sse", sseHandler)
 
-	// Wrap with auth middleware (skip if --no-auth)
-	var finalHandler http.Handler
-	if s.noAuth {
-		fmt.Println("⚠️  UWAGA: Autoryzacja wyłączona (--no-auth). Każdy z dostępem do URL może używać serwera.")
-		finalHandler = s.loggingMiddleware(mux)
-	} else {
-		authHandler := s.provider.AuthMiddleware(mux)
-		finalHandler = s.loggingMiddleware(authHandler)
-	}
-
 	s.httpServer = &http.Server{
 		Addr:    fmt.Sprintf("%s:%d", s.cfg.Host, s.cfg.Port),
-		Handler: finalHandler,
+		Handler: s.loggingMiddleware(mux),
 	}
 
 	// Auto-start Cloudflare Tunnel if available
@@ -127,6 +101,9 @@ func (s *Server) Start() error {
 
 		if err := s.httpServer.Shutdown(ctx); err != nil {
 			log.Error().Err(err).Msg("server shutdown error")
+		}
+		if s.tunnelStop != nil {
+			s.tunnelStop()
 		}
 		if s.store != nil {
 			s.store.Close()
@@ -155,6 +132,19 @@ func (s *Server) Start() error {
 
 	<-idleConnsClosed
 	return nil
+}
+
+func (s *Server) streamableMCPHandler() http.Handler {
+	return mcp.NewStreamableHTTPHandler(
+		func(r *http.Request) *mcp.Server {
+			return s.createMcpServer()
+		},
+		&mcp.StreamableHTTPOptions{
+			Stateless:                  true,
+			JSONResponse:               true,
+			DisableLocalhostProtection: true,
+		},
+	)
 }
 
 // startTunnel attempts to start a tunnel to expose the server publicly.
@@ -238,6 +228,7 @@ func (s *Server) startPinggy() string {
 
 	select {
 	case url := <-done:
+		s.tunnelStop = cancel
 		printTunnelURL(url)
 		return url
 	case <-time.After(15 * time.Second):
@@ -301,6 +292,7 @@ func (s *Server) startCloudflared() string {
 
 	select {
 	case url := <-done:
+		s.tunnelStop = cancel
 		printTunnelURL(url)
 		return url
 	case <-time.After(10 * time.Second):

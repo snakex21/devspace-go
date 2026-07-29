@@ -23,19 +23,6 @@ Koniec z ręcznym potwierdzaniem za każdym razem!
 | Dialog narzędzia MCP | Auto-klika "Zawsze zezwalaj" |
 | Modal bez potwierdzeń | Auto-potwierdza "Zawsze zezwalaj" |
 | Ekran połączenia | Auto-klika "Połącz" |
-| Strona OAuth MCP WebCoder | Auto-submituje jeśli hasło już wpisane |
-| Callback OAuth (pusta strona) | Auto-zamyka okno |
-
-## Konfiguracja hasła (opcjonalne)
-
-Jeśli chcesz, żeby skrypt automatycznie wpisywał hasło OAuth:
-
-1. Otwórz skrypt w Tampermonkey
-2. Znajdź obsługę `passwordField`
-3. Przed sprawdzeniem pustego hasła dodaj:
-```js
-passwordField.value = 'twoje-haslo-tutaj';
-```
 
 ## Wyłączenie
 

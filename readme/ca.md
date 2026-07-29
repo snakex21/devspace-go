@@ -2,7 +2,7 @@
 
 **Doneu a ChatGPT i Claude accés segur al vostre ordinador local. Convertiu qualsevol amfitrió MCP en el vostre company de codificació.**
 
-DevSpace és un servidor MCP autoallotjat que permet als assistents d'IA llegir, editar, buscar i executar codi als vostres projectes locals reals — els vostres fitxers, les vostres eines, el vostre terminal — sense penjar res a un tercer. L'executeu a la vostra màquina, l'exposeu a través d'un túnel que controleu i, opcionalment, el protegiu amb una contrasenya.
+DevSpace és un servidor MCP autoallotjat que permet als assistents d'IA llegir, editar, buscar i executar codi als vostres projectes locals reals — els vostres fitxers, les vostres eines, el vostre terminal — sense penjar res a un tercer. L'executeu a la vostra màquina, l'exposeu a través d'un túnel que controleu i, opcionalment.
 
 ---
 
@@ -101,8 +101,7 @@ Tota la configuració resideix **a la mateixa carpeta que l'executable** (portà
 
 ```
 .devspace/
-├── config.json       ← arrels permeses, port, intèrpret, idioma, autenticació
-└── auth.json         ← contrasenya del propietari (opcional)
+└── config.json       ← arrels permeses, port, intèrpret, idioma
 ```
 
 ### config.json
@@ -157,8 +156,6 @@ Establiu `"shell"` a config.json o trieu a la GUI.
 
 ## Seguretat
 
-- **OAuth 2.0 amb PKCE** — si s'estableix la contrasenya del propietari
-- **Mode sense contrasenya** — si no es configura cap contrasenya, s'executa sense autenticació
 - **Contenció de ruta** — totes les operacions de fitxers es validen contra les arrels permeses
 - **Túnel opcional** — El túnel de Cloudflare protegeix de l'exposició directa
 - **Sense càrregues a tercers** — el vostre codi mai no surt de la vostra màquina
@@ -204,7 +201,6 @@ devspace-go/
 │   ├── devspace/           ← CLI + servidor MCP
 │   └── devspace-gui/       ← Configurador d'escriptori GUI (Fyne)
 ├── internal/
-│   ├── auth/               ← Proveïdor OAuth 2.0 + PKCE
 │   ├── config/             ← Sistema de configuració portàtil
 │   ├── locales/            ← Traduccions a 47 idiomes
 │   ├── logger/             ← Registre estructurat (zerolog)

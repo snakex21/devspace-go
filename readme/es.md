@@ -2,7 +2,7 @@
 
 **Dele a ChatGPT y Claude acceso seguro a su máquina local. Convierta cualquier host MCP en su compañero de programación.**
 
-DevSpace es un servidor MCP autoalojado que permite a los asistentes de IA leer, editar, buscar y ejecutar código en sus proyectos locales reales — sus archivos, sus herramientas, su terminal — sin subir nada a un tercero. Lo ejecuta en su máquina, lo expone a través de un túnel que usted controla y, opcionalmente, lo asegura con una contraseña.
+DevSpace es un servidor MCP autoalojado que permite a los asistentes de IA leer, editar, buscar y ejecutar código en sus proyectos locales reales — sus archivos, sus herramientas, su terminal — sin subir nada a un tercero. Lo ejecuta en su máquina, lo expone a través de un túnel que usted controla y, opcionalmente.
 
 ---
 
@@ -101,8 +101,7 @@ Toda la configuración reside **en la misma carpeta que el ejecutable** (portát
 
 ```
 .devspace/
-├── config.json       ← raíces permitidas, puerto, shell, idioma, autenticación
-└── auth.json         ← contraseña del propietario (opcional)
+└── config.json       ← raíces permitidas, puerto, shell, idioma
 ```
 
 ### config.json
@@ -157,8 +156,6 @@ Establezca `"shell"` en config.json o elija en la GUI.
 
 ## Seguridad
 
-- **OAuth 2.0 con PKCE** — si se establece la contraseña del propietario
-- **Modo sin contraseña** — si no se configura contraseña, se ejecuta sin autenticación
 - **Contención de ruta** — todas las operaciones de archivos se validan contra las raíces permitidas
 - **Túnel opcional** — El túnel de Cloudflare protege de la exposición directa
 - **Sin cargas a terceros** — su código nunca sale de su máquina
@@ -204,7 +201,6 @@ devspace-go/
 │   ├── devspace/           ← CLI + servidor MCP
 │   └── devspace-gui/       ← Configurador de escritorio GUI (Fyne)
 ├── internal/
-│   ├── auth/               ← Proveedor OAuth 2.0 + PKCE
 │   ├── config/             ← Sistema de configuración portátil
 │   ├── locales/            ← Traducciones a 47 idiomas
 │   ├── logger/             ← Registro estructurado (zerolog)

@@ -2,7 +2,7 @@
 
 **Donnez à ChatGPT et Claude un accès sécurisé à votre machine locale. Transformez n'importe quel hôte MCP en votre partenaire de codage.**
 
-DevSpace est un serveur MCP auto-hébergé qui permet aux assistants IA de lire, modifier, rechercher et exécuter du code dans vos vrais projets locaux — vos fichiers, vos outils, votre terminal — sans rien télécharger vers un tiers. Vous l'exécutez sur votre machine, l'exposez via un tunnel que vous contrôlez et le sécurisez optionnellement avec un mot de passe.
+DevSpace est un serveur MCP auto-hébergé qui permet aux assistants IA de lire, modifier, rechercher et exécuter du code dans vos vrais projets locaux — vos fichiers, vos outils, votre terminal — sans rien télécharger vers un tiers. Vous l'exécutez sur votre machine.
 
 ---
 
@@ -101,8 +101,7 @@ Toute la configuration réside **dans le même dossier que l'exécutable** (port
 
 ```
 .devspace/
-├── config.json       ← racines autorisées, port, shell, langue, authentification
-└── auth.json         ← mot de passe du propriétaire (optionnel)
+└── config.json       ← racines autorisées, port, shell, langue
 ```
 
 ### config.json
@@ -157,8 +156,6 @@ Définissez `"shell"` dans config.json ou choisissez dans l'interface graphique.
 
 ## Sécurité
 
-- **OAuth 2.0 avec PKCE** — si le mot de passe du propriétaire est défini
-- **Mode sans mot de passe** — si aucun mot de passe n'est configuré, fonctionne sans authentification
 - **Confinement de chemin** — toutes les opérations sur les fichiers sont validées par rapport aux racines autorisées
 - **Tunnel optionnel** — le tunnel Cloudflare protège contre l'exposition directe
 - **Aucun téléchargement vers des tiers** — votre code ne quitte jamais votre machine
@@ -204,7 +201,6 @@ devspace-go/
 │   ├── devspace/           ← CLI + serveur MCP
 │   └── devspace-gui/       ← Configurateur graphique de bureau (Fyne)
 ├── internal/
-│   ├── auth/               ← Fournisseur OAuth 2.0 + PKCE
 │   ├── config/             ← Système de configuration portable
 │   ├── locales/            ← Traductions en 47 langues
 │   ├── logger/             ← Journalisation structurée (zerolog)

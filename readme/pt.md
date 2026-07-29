@@ -2,7 +2,7 @@
 
 **Dê ao ChatGPT e ao Claude acesso seguro à sua máquina local. Transforme qualquer host MCP no seu parceiro de codificação.**
 
-O DevSpace é um servidor MCP auto-hospedado que permite que assistentes de IA leiam, editem, pesquisem e executem código nos seus projetos locais reais — seus arquivos, suas ferramentas, seu terminal — sem enviar nada para terceiros. Você o executa na sua máquina, expõe através de um túnel que você controla e, opcionalmente, protege com uma senha.
+O DevSpace é um servidor MCP auto-hospedado que permite que assistentes de IA leiam, editem, pesquisem e executem código nos seus projetos locais reais — seus arquivos, suas ferramentas, seu terminal — sem enviar nada para terceiros. Você o executa na sua máquina, expõe através de um túnel que você controla e, opcionalmente.
 
 ---
 
@@ -101,8 +101,7 @@ Toda a configuração fica **na mesma pasta do executável** (portátil):
 
 ```
 .devspace/
-├── config.json       ← raízes permitidas, porta, shell, idioma, autenticação
-└── auth.json         ← senha do proprietário (opcional)
+└── config.json       ← raízes permitidas, porta, shell, idioma
 ```
 
 ### config.json
@@ -157,8 +156,6 @@ Defina `"shell"` no config.json ou escolha na GUI.
 
 ## Segurança
 
-- **OAuth 2.0 com PKCE** — se a senha do proprietário estiver definida
-- **Modo sem senha** — se nenhuma senha for configurada, executa sem autenticação
 - **Contenção de caminho** — todas as operações de arquivo são validadas contra as raízes permitidas
 - **Túnel opcional** — o Túnel Cloudflare protege contra exposição direta
 - **Sem uploads para terceiros** — seu código nunca sai da sua máquina
@@ -204,7 +201,6 @@ devspace-go/
 │   ├── devspace/           ← CLI + servidor MCP
 │   └── devspace-gui/       ← Configurador GUI de desktop (Fyne)
 ├── internal/
-│   ├── auth/               ← Provedor OAuth 2.0 + PKCE
 │   ├── config/             ← Sistema de configuração portátil
 │   ├── locales/            ← Traduções para 47 idiomas
 │   ├── logger/             ← Logging estruturado (zerolog)

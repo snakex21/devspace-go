@@ -2,7 +2,7 @@
 
 **Gee ChatGPT & Claude veilige toegang tot jou plaaslike masjien. Verander enige MCP-gasheer in jou kodeermaat.**
 
-DevSpace is 'n self-aangebode MCP-bediener wat KI-assistente toelaat om kode in jou werklike plaaslike projekte te lees, redigeer, soek en uit te voer — jou lêers, jou gereedskap, jou terminaal — sonder om enigiets na 'n derde party op te laai. Jy hardloop dit op jou masjien, stel dit bloot deur 'n tonnel wat jy beheer, en beveilig dit opsioneel met 'n wagwoord.
+DevSpace is 'n self-aangebode MCP-bediener wat KI-assistente toelaat om kode in jou werklike plaaslike projekte te lees, redigeer, soek en uit te voer — jou lêers, jou gereedskap, jou terminaal — sonder om enigiets na 'n derde party op te laai. Jy hardloop dit op jou masjien, stel dit bloot deur 'n tonnel wat jy beheer.
 
 ---
 
@@ -101,8 +101,7 @@ Alle konfigurasie woon **in dieselfde gids as die uitvoerbare lêer** (draagbaar
 
 ```
 .devspace/
-├── config.json       ← toegelate wortels, poort, dop, taal, magtiging
-└── auth.json         ← eienaar wagwoord (opsioneel)
+└── config.json       ← toegelate wortels, poort, dop, taal
 ```
 
 ### config.json
@@ -157,8 +156,6 @@ Stel `"shell"` in config.json of kies in die GUI.
 
 ## Sekuriteit
 
-- **OAuth 2.0 met PKCE** — indien eienaarwagwoord gestel is
-- **Wagwoordlose modus** — indien geen wagwoord gekonfigureer is, hardloop sonder magtiging
 - **Padbeperking** — alle lêerbewerkings gevalideer teen toegelate wortels
 - **Opsionele tonnel** — Cloudflare-tonnel beskerm teen direkte blootstelling
 - **Geen derdeparty-oplaai** — jou kode verlaat nooit jou masjien nie
@@ -204,7 +201,6 @@ devspace-go/
 │   ├── devspace/           ← CLI + MCP-bediener
 │   └── devspace-gui/       ← Werkskerm-GUI-konfigureerder (Fyne)
 ├── internal/
-│   ├── auth/               ← OAuth 2.0 + PKCE-verskaffer
 │   ├── config/             ← Draagbare konfigurasiestelsel
 │   ├── locales/            ← 47 taalvertalings
 │   ├── logger/             ← Gestruktureerde logboek (zerolog)
