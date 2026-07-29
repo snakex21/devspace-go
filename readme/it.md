@@ -2,7 +2,7 @@
 
 **Dai a ChatGPT e Claude accesso sicuro alla tua macchina locale. Trasforma qualsiasi host MCP nel tuo partner di codifica.**
 
-DevSpace è un server MCP auto-ospitato che consente agli assistenti AI di leggere, modificare, cercare ed eseguire codice nei tuoi veri progetti locali — i tuoi file, i tuoi strumenti, il tuo terminale — senza caricare nulla su terze parti. Lo esegui sulla tua macchina, lo esponi attraverso un tunnel che controlli e opzionalmente lo proteggi con una password.
+DevSpace è un server MCP auto-ospitato che consente agli assistenti AI di leggere, modificare, cercare ed eseguire codice nei tuoi veri progetti locali — i tuoi file, i tuoi strumenti, il tuo terminale — senza caricare nulla su terze parti. Lo esegui sulla tua macchina.
 
 ---
 
@@ -101,8 +101,7 @@ Tutta la configurazione risiede **nella stessa cartella dell'eseguibile** (porta
 
 ```
 .devspace/
-├── config.json       ← root consentite, porta, shell, lingua, autenticazione
-└── auth.json         ← password proprietario (opzionale)
+└── config.json       ← root consentite, porta, shell, lingua
 ```
 
 ### config.json
@@ -157,8 +156,6 @@ Imposta `"shell"` in config.json o scegli nella GUI.
 
 ## Sicurezza
 
-- **OAuth 2.0 con PKCE** — se è impostata la password del proprietario
-- **Modalità senza password** — se nessuna password è configurata, funziona senza autenticazione
 - **Contenimento del percorso** — tutte le operazioni sui file sono convalidate rispetto alle root consentite
 - **Tunnel opzionale** — il Tunnel Cloudflare protegge dall'esposizione diretta
 - **Nessun caricamento a terzi** — il tuo codice non lascia mai la tua macchina
@@ -204,7 +201,6 @@ devspace-go/
 │   ├── devspace/           ← CLI + server MCP
 │   └── devspace-gui/       ← Configuratore GUI desktop (Fyne)
 ├── internal/
-│   ├── auth/               ← Provider OAuth 2.0 + PKCE
 │   ├── config/             ← Sistema di configurazione portatile
 │   ├── locales/            ← Traduzioni in 47 lingue
 │   ├── logger/             ← Logging strutturato (zerolog)

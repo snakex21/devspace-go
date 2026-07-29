@@ -2,7 +2,7 @@
 
 **Dejte ChatGPT a Claude bezpečný přístup k vašemu lokálnímu počítači. Proměňte jakéhokoli MCP hostitele ve svého parťáka pro programování.**
 
-DevSpace je samo-hostovaný MCP server, který umožňuje AI asistentům číst, upravovat, vyhledávat a spouštět kód ve vašich skutečných lokálních projektech — vaše soubory, vaše nástroje, váš terminál — bez nahrávání čehokoli třetí straně. Spustíte ho na svém počítači, vystavíte ho přes tunel, který ovládáte, a volitelně ho zabezpečíte heslem.
+DevSpace je samo-hostovaný MCP server, který umožňuje AI asistentům číst, upravovat, vyhledávat a spouštět kód ve vašich skutečných lokálních projektech — vaše soubory, vaše nástroje, váš terminál — bez nahrávání čehokoli třetí straně. Spustíte ho na svém počítači, vystavíte ho přes tunel, který ovládáte.
 
 ---
 
@@ -101,8 +101,7 @@ Veškerá konfigurace je **ve stejné složce jako spustitelný soubor** (přeno
 
 ```
 .devspace/
-├── config.json       ← povolené kořeny, port, shell, jazyk, autentizace
-└── auth.json         ← heslo vlastníka (volitelné)
+└── config.json       ← povolené kořeny, port, shell, jazyk
 ```
 
 ### config.json
@@ -157,8 +156,6 @@ Nastavte `"shell"` v config.json nebo vyberte v GUI.
 
 ## Zabezpečení
 
-- **OAuth 2.0 s PKCE** — pokud je nastaveno heslo vlastníka
-- **Režim bez hesla** — pokud není heslo nakonfigurováno, běží bez autentizace
 - **Omezení cesty** — všechny souborové operace jsou validovány proti povoleným kořenům
 - **Volitelný tunel** — Cloudflare tunel chrání před přímým vystavením
 - **Žádná nahrávání třetím stranám** — váš kód nikdy neopouští váš počítač
@@ -204,7 +201,6 @@ devspace-go/
 │   ├── devspace/           ← CLI + MCP server
 │   └── devspace-gui/       ← Desktopový GUI konfigurátor (Fyne)
 ├── internal/
-│   ├── auth/               ← Poskytovatel OAuth 2.0 + PKCE
 │   ├── config/             ← Přenosný konfigurační systém
 │   ├── locales/            ← Překlady do 47 jazyků
 │   ├── logger/             ← Strukturované logování (zerolog)

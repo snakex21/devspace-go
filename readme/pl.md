@@ -2,7 +2,7 @@
 
 **Daj ChatGPT i Claude bezpieczny dostęp do swojego lokalnego komputera. Zamień dowolny host MCP w swojego partnera do kodowania.**
 
-DevSpace to samodzielnie hostowany serwer MCP, który pozwala asystentom AI czytać, edytować, wyszukiwać i uruchamiać kod w Twoich rzeczywistych lokalnych projektach — Twoje pliki, Twoje narzędzia, Twój terminal — bez przesyłania czegokolwiek do stron trzecich. Uruchamiasz go na swoim komputerze, udostępniasz przez kontrolowany przez siebie tunel i opcjonalnie zabezpieczasz hasłem.
+DevSpace to samodzielnie hostowany serwer MCP, który pozwala asystentom AI czytać, edytować, wyszukiwać i uruchamiać kod w Twoich rzeczywistych lokalnych projektach — Twoje pliki, Twoje narzędzia, Twój terminal — bez przesyłania czegokolwiek do stron trzecich. Uruchamiasz go na swoim komputerze i udostępniasz przez kontrolowany przez siebie tunel.
 
 ---
 
@@ -101,8 +101,7 @@ Cała konfiguracja znajduje się **w tym samym folderze co plik wykonywalny** (p
 
 ```
 .devspace/
-├── config.json       ← dozwolone katalogi główne, port, powłoka, język, uwierzytelnianie
-└── auth.json         ← hasło właściciela (opcjonalnie)
+└── config.json       ← dozwolone katalogi główne, port, powłoka, język
 ```
 
 ### config.json
@@ -157,10 +156,9 @@ Ustaw `"shell"` w config.json lub wybierz w GUI.
 
 ## Bezpieczeństwo
 
-- **OAuth 2.0 z PKCE** — jeśli ustawiono hasło właściciela
-- **Tryb bez hasła** — jeśli nie skonfigurowano hasła, działa bez uwierzytelniania
+- **Brak wbudowanego uwierzytelniania** — każdy, kto zna publiczny adres tunelu, może używać serwera
 - **Ograniczenie ścieżek** — wszystkie operacje na plikach są sprawdzane względem dozwolonych katalogów głównych
-- **Opcjonalny tunel** — tunel Cloudflare chroni przed bezpośrednim wystawieniem
+- **Dostęp przez tunel** — traktuj publiczny adres jak sekret i wyłączaj serwer, gdy go nie używasz
 - **Brak wysyłania do stron trzecich** — Twój kod nigdy nie opuszcza Twojego komputera
 
 ---
@@ -204,7 +202,6 @@ devspace-go/
 │   ├── devspace/           ← CLI + serwer MCP
 │   └── devspace-gui/       ← Konfigurator pulpitu GUI (Fyne)
 ├── internal/
-│   ├── auth/               ← Dostawca OAuth 2.0 + PKCE
 │   ├── config/             ← Przenośny system konfiguracji
 │   ├── locales/            ← Tłumaczenia na 47 języków
 │   ├── logger/             ← Strukturalne logowanie (zerolog)

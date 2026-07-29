@@ -2,7 +2,7 @@
 
 **Andke ChatGPT-le ja Claude'ile turvaline juurdepääs oma kohalikule masinale. Muutke iga MCP host oma kodeerimispartneriks.**
 
-DevSpace on isemajutatud MCP-server, mis võimaldab AI-assistentidel lugeda, redigeerida, otsida ja käivitada koodi teie päris kohalikes projektides — teie failid, teie tööriistad, teie terminal — ilma midagi kolmandale osapoolele üles laadimata. Käivitate selle oma masinas, eksponeerite selle enda kontrollitava tunneli kaudu ja valikuliselt kaitsete parooliga.
+DevSpace on isemajutatud MCP-server, mis võimaldab AI-assistentidel lugeda, redigeerida, otsida ja käivitada koodi teie päris kohalikes projektides — teie failid, teie tööriistad, teie terminal — ilma midagi kolmandale osapoolele üles laadimata. Käivitate selle oma masinas.
 
 ---
 
@@ -101,8 +101,7 @@ Kogu seadistus asub **käivitatava failiga samas kaustas** (kaasaskantav):
 
 ```
 .devspace/
-├── config.json       ← lubatud juured, port, kest, keel, autentimine
-└── auth.json         ← omaniku parool (valikuline)
+└── config.json       ← lubatud juured, port, kest, keel
 ```
 
 ### config.json
@@ -157,8 +156,6 @@ Määrake `"shell"` failis config.json või valige GUI-s.
 
 ## Turvalisus
 
-- **OAuth 2.0 koos PKCE-ga** — kui omaniku parool on määratud
-- **Paroolita režiim** — kui parooli pole seadistatud, töötab ilma autentimiseta
 - **Tee piiramine** — kõik failitoimingud valideeritakse lubatud juurte suhtes
 - **Valikuline tunnel** — Cloudflare'i tunnel kaitseb otsese eksponeerimise eest
 - **Pole kolmanda osapoole üleslaadimisi** — teie kood ei lahku kunagi teie masinast
@@ -204,7 +201,6 @@ devspace-go/
 │   ├── devspace/           ← CLI + MCP server
 │   └── devspace-gui/       ← Töölaua GUI seadistaja (Fyne)
 ├── internal/
-│   ├── auth/               ← OAuth 2.0 + PKCE pakkuja
 │   ├── config/             ← Kaasaskantav seadistussüsteem
 │   ├── locales/            ← 47 keeletõlget
 │   ├── logger/             ← Struktureeritud logimine (zerolog)

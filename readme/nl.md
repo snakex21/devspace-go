@@ -2,7 +2,7 @@
 
 **Geef ChatGPT en Claude veilige toegang tot je lokale machine. Maak van elke MCP-host je codeerpartner.**
 
-DevSpace is een zelfgehoste MCP-server waarmee AI-assistenten bestanden kunnen lezen, bewerken, doorzoeken en code kunnen uitvoeren in jouw echte lokale projecten — jouw bestanden, jouw tools, jouw terminal — zonder iets naar een derde partij te uploaden. Je draait het op je eigen machine, stelt het bloot via een tunnel die jij beheert en beveiligt het optioneel met een wachtwoord.
+DevSpace is een zelfgehoste MCP-server waarmee AI-assistenten bestanden kunnen lezen, bewerken, doorzoeken en code kunnen uitvoeren in jouw echte lokale projecten — jouw bestanden, jouw tools, jouw terminal — zonder iets naar een derde partij te uploaden. Je draait het op je eigen machine.
 
 ---
 
@@ -101,8 +101,7 @@ Alle configuratie bevindt zich **in dezelfde map als het uitvoerbare bestand** (
 
 ```
 .devspace/
-├── config.json       ← toegestane roots, poort, shell, taal, authenticatie
-└── auth.json         ← eigenaarswachtwoord (optioneel)
+└── config.json       ← toegestane roots, poort, shell, taal
 ```
 
 ### config.json
@@ -157,8 +156,6 @@ Stel `"shell"` in config.json in of kies in de GUI.
 
 ## Beveiliging
 
-- **OAuth 2.0 met PKCE** — als het eigenaarswachtwoord is ingesteld
-- **Wachtwoordloze modus** — als er geen wachtwoord is geconfigureerd, draait het zonder authenticatie
 - **Padbeperking** — alle bestandsoperaties worden gevalideerd tegen toegestane roots
 - **Optionele tunnel** — Cloudflare-tunnel beschermt tegen directe blootstelling
 - **Geen uploads naar derden** — je code verlaat nooit je machine
@@ -204,7 +201,6 @@ devspace-go/
 │   ├── devspace/           ← CLI + MCP-server
 │   └── devspace-gui/       ← Desktop GUI-configurator (Fyne)
 ├── internal/
-│   ├── auth/               ← OAuth 2.0 + PKCE-provider
 │   ├── config/             ← Draagbaar configuratiesysteem
 │   ├── locales/            ← Vertalingen in 47 talen
 │   ├── logger/             ← Gestructureerde logging (zerolog)

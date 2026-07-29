@@ -2,7 +2,7 @@
 
 **Cấp cho ChatGPT và Claude quyền truy cập an toàn vào máy tính cục bộ của bạn. Biến bất kỳ máy chủ MCP nào thành đối tác lập trình của bạn.**
 
-DevSpace là một máy chủ MCP tự lưu trữ cho phép trợ lý AI đọc, chỉnh sửa, tìm kiếm và chạy mã trong các dự án cục bộ thực tế của bạn — tệp của bạn, công cụ của bạn, thiết bị đầu cuối của bạn — mà không tải lên bất cứ thứ gì cho bên thứ ba. Bạn chạy nó trên máy của mình, phơi bày nó qua một đường hầm mà bạn kiểm soát và tùy chọn bảo mật bằng mật khẩu.
+DevSpace là một máy chủ MCP tự lưu trữ cho phép trợ lý AI đọc, chỉnh sửa, tìm kiếm và chạy mã trong các dự án cục bộ thực tế của bạn — tệp của bạn, công cụ của bạn, thiết bị đầu cuối của bạn — mà không tải lên bất cứ thứ gì cho bên thứ ba. Bạn chạy nó trên máy của mình.
 
 ---
 
@@ -101,8 +101,7 @@ Tất cả cấu hình nằm **trong cùng thư mục với tệp thực thi** (
 
 ```
 .devspace/
-├── config.json       ← thư mục gốc được phép, cổng, shell, ngôn ngữ, xác thực
-└── auth.json         ← mật khẩu chủ sở hữu (tùy chọn)
+└── config.json       ← thư mục gốc được phép, cổng, shell, ngôn ngữ
 ```
 
 ### config.json
@@ -157,8 +156,6 @@ Máy chủ tự động phát hiện cái nào khả dụng. Khởi động lạ
 
 ## Bảo Mật
 
-- **OAuth 2.0 với PKCE** — nếu mật khẩu chủ sở hữu được đặt
-- **Chế độ không mật khẩu** — nếu không có mật khẩu được cấu hình, chạy mà không cần xác thực
 - **Giới hạn đường dẫn** — tất cả thao tác tệp được xác thực dựa trên thư mục gốc được phép
 - **Đường hầm tùy chọn** — Đường hầm Cloudflare bảo vệ khỏi phơi nhiễm trực tiếp
 - **Không tải lên bên thứ ba** — mã của bạn không bao giờ rời khỏi máy của bạn
@@ -204,7 +201,6 @@ devspace-go/
 │   ├── devspace/           ← CLI + máy chủ MCP
 │   └── devspace-gui/       ← Trình cấu hình GUI máy tính để bàn (Fyne)
 ├── internal/
-│   ├── auth/               ← Nhà cung cấp OAuth 2.0 + PKCE
 │   ├── config/             ← Hệ thống cấu hình di động
 │   ├── locales/            ← Bản dịch 47 ngôn ngữ
 │   ├── logger/             ← Ghi nhật ký có cấu trúc (zerolog)

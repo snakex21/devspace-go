@@ -2,7 +2,7 @@
 
 **Dodiet ChatGPT un Claude drošu piekļuvi savam lokālajam datoram. Pārvērtiet jebkuru MCP resursdatoru par savu programmēšanas partneri.**
 
-DevSpace ir pašmitināts MCP serveris, kas ļauj AI asistentiem lasīt, rediģēt, meklēt un palaist kodu jūsu reālajos lokālajos projektos — jūsu faili, jūsu rīki, jūsu terminālis — neko neaugšupielādējot trešajām pusēm. Jūs to palaižat savā datorā, atklājat caur jūsu kontrolētu tuneli un pēc izvēles aizsargājat ar paroli.
+DevSpace ir pašmitināts MCP serveris, kas ļauj AI asistentiem lasīt, rediģēt, meklēt un palaist kodu jūsu reālajos lokālajos projektos — jūsu faili, jūsu rīki, jūsu terminālis — neko neaugšupielādējot trešajām pusēm. Jūs to palaižat savā datorā.
 
 ---
 
@@ -101,8 +101,7 @@ Visa konfigurācija atrodas **tajā pašā mapē kā izpildāmais fails** (pārn
 
 ```
 .devspace/
-├── config.json       ← atļautās saknes, ports, čaula, valoda, autentifikācija
-└── auth.json         ← īpašnieka parole (pēc izvēles)
+└── config.json       ← atļautās saknes, ports, čaula, valoda
 ```
 
 ### config.json
@@ -157,8 +156,6 @@ Iestatiet `"shell"` config.json vai izvēlieties GUI.
 
 ## Drošība
 
-- **OAuth 2.0 ar PKCE** — ja ir iestatīta īpašnieka parole
-- **Režīms bez paroles** — ja parole nav konfigurēta, darbojas bez autentifikācijas
 - **Ceļa ierobežošana** — visas failu operācijas tiek validētas pret atļautajām saknēm
 - **Izvēles tunelis** — Cloudflare tunelis aizsargā pret tiešu pakļaušanu
 - **Nav augšupielādes trešajām pusēm** — jūsu kods nekad neatstāj jūsu datoru
@@ -204,7 +201,6 @@ devspace-go/
 │   ├── devspace/           ← CLI + MCP serveris
 │   └── devspace-gui/       ← Darbvirsmas GUI konfigurators (Fyne)
 ├── internal/
-│   ├── auth/               ← OAuth 2.0 + PKCE nodrošinātājs
 │   ├── config/             ← Pārnēsājama konfigurācijas sistēma
 │   ├── locales/            ← Tulkojumi 47 valodās
 │   ├── logger/             ← Strukturēta žurnālēšana (zerolog)

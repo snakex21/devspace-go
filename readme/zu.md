@@ -2,7 +2,7 @@
 
 **Nikeza u-ChatGPT no-Claude ukufinyelela okuphephile emshinini wakho wendawo. Guqula noma iyiphi i-host ye-MCP ibe umlingani wakho wokubhala amakhodi.**
 
-I-DevSpace iyiseva ye-MCP ezisingathayo evumela abasizi be-AI ukuthi bafunde, bahlele, bacinge, futhi basebenzise ikhodi kumaphrojekthi akho angempela endawo — amafayela akho, amathuluzi akho, itheminali yakho — ngaphandle kokulayisha noma yini kumuntu wesithathu. Uyisebenzisa emshinini wakho, uyiveze ngomhubhe owulawulayo, futhi ngokuzikhethela uyivikele ngephasiwedi.
+I-DevSpace iyiseva ye-MCP ezisingathayo evumela abasizi be-AI ukuthi bafunde, bahlele, bacinge, futhi basebenzise ikhodi kumaphrojekthi akho angempela endawo — amafayela akho, amathuluzi akho, itheminali yakho — ngaphandle kokulayisha noma yini kumuntu wesithathu. Uyisebenzisa emshinini wakho, uyiveze ngomhubhe owulawulayo.
 
 ---
 
@@ -101,8 +101,7 @@ Konke ukumisa kutholakala **kufolda efanayo nefayela elisebenzisekayo** (okuphat
 
 ```
 .devspace/
-├── config.json       ← izimpande ezigunyaziwe, imbobo, i-shell, ulimi, ukuqinisekiswa
-└── auth.json         ← iphasiwedi yomnikazi (ngokuzikhethela)
+└── config.json       ← izimpande ezigunyaziwe, imbobo, i-shell, ulimi
 ```
 
 ### config.json
@@ -157,8 +156,6 @@ Setha `"shell"` ku-config.json noma ukhethe ku-GUI.
 
 ## Ukuvikeleka
 
-- **I-OAuth 2.0 ene-PKCE** — uma iphasiwedi yomnikazi isethiwe
-- **Imodi engenaphasiwedi** — uma kungekho phasiwedi emisiwe, isebenza ngaphandle kokuqinisekiswa
 - **Ukuvinjelwa kwendlela** — yonke imisebenzi yamafayela iqinisekiswa ngokumelene nezimpande ezigunyaziwe
 - **Umhubhe ongakhethwa** — Umhubhe we-Cloudflare uvikela ekuvezweni okuqondile
 - **Akukho ukulayishwa kumuntu wesithathu** — ikhodi yakho ayilokothi ishiye umshini wakho
@@ -204,7 +201,6 @@ devspace-go/
 │   ├── devspace/           ← I-CLI + iseva ye-MCP
 │   └── devspace-gui/       ← Isimisi se-GUI sedeskithophu (Fyne)
 ├── internal/
-│   ├── auth/               ← Umhlinzeki we-OAuth 2.0 + PKCE
 │   ├── config/             ← Isistimu yokumisa ephathekayo
 │   ├── locales/            ← Ukuhunyushwa kwezilimi ezingama-47
 │   ├── logger/             ← Ukuloga okuhlelekile (zerolog)

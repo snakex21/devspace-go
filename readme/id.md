@@ -2,7 +2,7 @@
 
 **Berikan ChatGPT & Claude akses aman ke mesin lokal Anda. Ubah host MCP mana pun menjadi mitra koding Anda.**
 
-DevSpace adalah server MCP yang di-host sendiri yang memungkinkan asisten AI membaca, mengedit, mencari, dan menjalankan kode di proyek lokal nyata Anda — file Anda, alat Anda, terminal Anda — tanpa mengunggah apa pun ke pihak ketiga. Anda menjalankannya di mesin Anda, mengeksposnya melalui terowongan yang Anda kendalikan, dan secara opsional mengamankannya dengan kata sandi.
+DevSpace adalah server MCP yang di-host sendiri yang memungkinkan asisten AI membaca, mengedit, mencari, dan menjalankan kode di proyek lokal nyata Anda — file Anda, alat Anda, terminal Anda — tanpa mengunggah apa pun ke pihak ketiga. Anda menjalankannya di mesin Anda, mengeksposnya melalui terowongan yang Anda kendalikan.
 
 ---
 
@@ -101,8 +101,7 @@ Semua konfigurasi berada **di folder yang sama dengan file executable** (portabe
 
 ```
 .devspace/
-├── config.json       ← root yang diizinkan, port, shell, bahasa, auth
-└── auth.json         ← kata sandi pemilik (opsional)
+└── config.json       ← root yang diizinkan, port, shell, bahasa
 ```
 
 ### config.json
@@ -157,8 +156,6 @@ Atur `"shell"` di config.json atau pilih di GUI.
 
 ## Keamanan
 
-- **OAuth 2.0 dengan PKCE** — jika kata sandi pemilik diatur
-- **Mode tanpa kata sandi** — jika tidak ada kata sandi yang dikonfigurasi, berjalan tanpa auth
 - **Pembatasan jalur** — semua operasi file divalidasi terhadap root yang diizinkan
 - **Terowongan opsional** — Terowongan Cloudflare melindungi dari paparan langsung
 - **Tanpa unggahan pihak ketiga** — kode Anda tidak pernah meninggalkan mesin Anda
@@ -204,7 +201,6 @@ devspace-go/
 │   ├── devspace/           ← CLI + server MCP
 │   └── devspace-gui/       ← Konfigurator GUI desktop (Fyne)
 ├── internal/
-│   ├── auth/               ← Penyedia OAuth 2.0 + PKCE
 │   ├── config/             ← Sistem konfigurasi portabel
 │   ├── locales/            ← Terjemahan 47 bahasa
 │   ├── logger/             ← Pencatatan terstruktur (zerolog)

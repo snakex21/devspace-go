@@ -2,7 +2,7 @@
 
 **ChatGPT ve Claude'a yerel makinenize güvenli erişim verin. Herhangi bir MCP sunucusunu kodlama ortağınıza dönüştürün.**
 
-DevSpace, AI asistanlarının gerçek yerel projelerinizde — dosyalarınız, araçlarınız, terminaliniz — hiçbir şeyi üçüncü taraflara yüklemeden kod okumasına, düzenlemesine, aramasına ve çalıştırmasına olanak tanıyan, kendi kendine barındırılan bir MCP sunucusudur. Kendi makinenizde çalıştırır, kontrol ettiğiniz bir tünel aracılığıyla erişime açar ve isteğe bağlı olarak bir parola ile güvence altına alırsınız.
+DevSpace, AI asistanlarının gerçek yerel projelerinizde — dosyalarınız, araçlarınız, terminaliniz — hiçbir şeyi üçüncü taraflara yüklemeden kod okumasına, düzenlemesine, aramasına ve çalıştırmasına olanak tanıyan, kendi kendine barındırılan bir MCP sunucusudur. Kendi makinenizde çalıştırır.
 
 ---
 
@@ -101,8 +101,7 @@ Tüm yapılandırma **çalıştırılabilir dosya ile aynı klasördedir** (taş
 
 ```
 .devspace/
-├── config.json       ← izin verilen kökler, port, kabuk, dil, kimlik doğrulama
-└── auth.json         ← sahip parolası (isteğe bağlı)
+└── config.json       ← izin verilen kökler, port, kabuk, dil
 ```
 
 ### config.json
@@ -157,8 +156,6 @@ config.json içinde `"shell"` ayarını yapın veya GUI'den seçin.
 
 ## Güvenlik
 
-- **PKCE ile OAuth 2.0** — sahip parolası ayarlanmışsa
-- **Parolasız mod** — parola yapılandırılmamışsa, kimlik doğrulama olmadan çalışır
 - **Yol kısıtlaması** — tüm dosya işlemleri izin verilen köklere göre doğrulanır
 - **İsteğe bağlı tünel** — Cloudflare Tüneli doğrudan maruz kalmaya karşı korur
 - **Üçüncü taraf yüklemeleri yok** — kodunuz asla makinenizden ayrılmaz
@@ -204,7 +201,6 @@ devspace-go/
 │   ├── devspace/           ← CLI + MCP sunucusu
 │   └── devspace-gui/       ← Masaüstü GUI yapılandırıcı (Fyne)
 ├── internal/
-│   ├── auth/               ← OAuth 2.0 + PKCE sağlayıcı
 │   ├── config/             ← Taşınabilir yapılandırma sistemi
 │   ├── locales/            ← 47 dil çevirisi
 │   ├── logger/             ← Yapılandırılmış günlükleme (zerolog)
