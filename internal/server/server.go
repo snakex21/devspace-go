@@ -16,7 +16,6 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/rs/zerolog/log"
-	"github.com/snakex21/devspace-go/internal/auth"
 	"github.com/snakex21/devspace-go/internal/config"
 	"github.com/snakex21/devspace-go/internal/logger"
 	"github.com/snakex21/devspace-go/internal/store"
@@ -32,14 +31,12 @@ type Server struct {
 	cfg        *config.Config
 	httpServer *http.Server
 	tunnelStop context.CancelFunc
-	provider   *auth.Provider
 	registry   *workspace.Registry
 	store      *store.Store
-	noAuth     bool
 }
 
 // New creates a new MCP WebCoder server.
-func New(cfg *config.Config, noAuth bool) (*Server, error) {
+func New(cfg *config.Config) (*Server, error) {
 	logger.Init(string(cfg.Logging.Level), string(cfg.Logging.Format))
 	tools.SetShell(cfg.Shell)
 
@@ -49,14 +46,11 @@ func New(cfg *config.Config, noAuth bool) (*Server, error) {
 	}
 
 	registry := workspace.NewRegistry(cfg, s)
-	provider := auth.NewProvider(cfg)
 
 	return &Server{
 		cfg:      cfg,
-		provider: provider,
 		registry: registry,
 		store:    s,
-		noAuth:   noAuth,
 	}, nil
 }
 
@@ -69,15 +63,6 @@ func (s *Server) Start() error {
 		w.Header().Set("Content-Type", "application/json")
 		fmt.Fprintf(w, `{"ok":true,"name":"mcp-webcoder"}`)
 	})
-
-	// OAuth endpoints
-	mux.HandleFunc("/.well-known/oauth-authorization-server", s.provider.HandleOAuthMetadata)
-	mux.HandleFunc("/.well-known/oauth-protected-resource", s.provider.HandleProtectedResourceMetadata)
-	mux.HandleFunc("/.well-known/oauth-protected-resource/mcp", s.provider.HandleProtectedResourceMetadata)
-	mux.HandleFunc("/authorize", s.provider.HandleAuthorize)
-	mux.HandleFunc("/token", s.provider.HandleToken)
-	mux.HandleFunc("/revoke", s.provider.HandleRevoke)
-	mux.HandleFunc("/register", s.provider.HandleRegister)
 
 	// MCP endpoint using stateless Streamable HTTP. Workspace state is tracked
 	// separately by workspaceId, so transport sessions only add another failure
@@ -95,19 +80,9 @@ func (s *Server) Start() error {
 	)
 	mux.Handle("/sse", sseHandler)
 
-	// Wrap with auth middleware (skip if --no-auth)
-	var finalHandler http.Handler
-	if s.noAuth {
-		fmt.Println("⚠️  UWAGA: Autoryzacja wyłączona (--no-auth). Każdy z dostępem do URL może używać serwera.")
-		finalHandler = s.loggingMiddleware(mux)
-	} else {
-		authHandler := s.provider.AuthMiddleware(mux)
-		finalHandler = s.loggingMiddleware(authHandler)
-	}
-
 	s.httpServer = &http.Server{
 		Addr:    fmt.Sprintf("%s:%d", s.cfg.Host, s.cfg.Port),
-		Handler: finalHandler,
+		Handler: s.loggingMiddleware(mux),
 	}
 
 	// Auto-start Cloudflare Tunnel if available

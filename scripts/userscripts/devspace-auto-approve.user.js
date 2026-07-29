@@ -218,37 +218,8 @@
         }
     }
 
-    function handleOAuthPopup() {
-        const title = norm(document.title);
-        const text = norm(document.body?.textContent || '');
-        if (!window.location.pathname.includes('/authorize') && !title.includes('authorization') && !text.includes('authorization')) {
-            return;
-        }
-
-        const passwordField = document.querySelector('input[type="password"]');
-        const submitBtn = findButton(document, ['authorize', 'autoryzuj', 'submit', 'wyślij', 'sign in', 'zaloguj', 'connect', 'połącz']);
-
-        if (!submitBtn) return;
-        if (passwordField && passwordField.value.length === 0) return;
-
-        safeClick(submitBtn, 'oauth authorize');
-    }
-
-    function handlePostOAuthBlank() {
-        if (window.location.search.includes('code=') &&
-            (document.body.innerText.trim() === '' || document.body.innerText.length < 100)) {
-            log('OAuth callback detected, closing popup...');
-            window.close();
-            setTimeout(() => {
-                document.body.innerHTML = '<h2 style="text-align:center;margin-top:40px;font-family:sans-serif">✅ Authorization complete. You can close this window.</h2>';
-            }, 500);
-        }
-    }
-
     function run() {
         scan();
-        handleOAuthPopup();
-        handlePostOAuthBlank();
     }
 
     function startObserver() {
