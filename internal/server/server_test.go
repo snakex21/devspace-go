@@ -4,6 +4,10 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"net/http/httputil"
+	"net/url"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -65,5 +69,79 @@ func TestStreamableMCPStaysUsableAcrossRepeatedRequests(t *testing.T) {
 	}
 	if result.IsError {
 		t.Fatalf("open_default_workspace returned an MCP error: %#v", result.Content)
+	}
+}
+
+func TestStreamableMCPThroughSessionDroppingProxyAndReconnects(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "fixture.txt"), []byte("proxy reconnect test"), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := config.DefaultConfig()
+	cfg.AllowedRoots = []string{root}
+
+	server := &Server{
+		cfg:      cfg,
+		registry: workspace.NewRegistry(cfg, nil),
+	}
+	upstream := httptest.NewServer(server.streamableMCPHandler())
+	defer upstream.Close()
+
+	upstreamURL, err := url.Parse(upstream.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	proxyHandler := httputil.NewSingleHostReverseProxy(upstreamURL)
+	originalDirector := proxyHandler.Director
+	proxyHandler.Director = func(req *http.Request) {
+		originalDirector(req)
+		req.Header.Del("Mcp-Session-Id")
+		req.Close = true
+	}
+
+	proxy := httptest.NewServer(proxyHandler)
+	defer proxy.Close()
+
+	httpClient := &http.Client{
+		Transport: &http.Transport{DisableKeepAlives: true},
+	}
+	defer httpClient.CloseIdleConnections()
+
+	ctx := context.Background()
+	for reconnect := 1; reconnect <= 10; reconnect++ {
+		client := mcp.NewClient(&mcp.Implementation{
+			Name:    "proxy-reconnect-test",
+			Version: "1.0.0",
+		}, nil)
+		session, err := client.Connect(ctx, &mcp.StreamableClientTransport{
+			Endpoint:   proxy.URL,
+			HTTPClient: httpClient,
+		}, nil)
+		if err != nil {
+			t.Fatalf("reconnect %d failed: %v", reconnect, err)
+		}
+
+		for call := 1; call <= 10; call++ {
+			result, err := session.CallTool(ctx, &mcp.CallToolParams{
+				Name: "read",
+				Arguments: map[string]any{
+					"workspaceId": "default",
+					"path":        "fixture.txt",
+				},
+			})
+			if err != nil {
+				session.Close()
+				t.Fatalf("reconnect %d, tool call %d failed: %v", reconnect, call, err)
+			}
+			if result.IsError {
+				session.Close()
+				t.Fatalf("reconnect %d, tool call %d returned an MCP error: %#v", reconnect, call, result.Content)
+			}
+		}
+
+		if err := session.Close(); err != nil {
+			t.Fatalf("reconnect %d close failed: %v", reconnect, err)
+		}
 	}
 }
