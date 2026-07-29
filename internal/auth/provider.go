@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/waishnav/mcp-webcoder/internal/config"
+	"github.com/snakex21/devspace-go/internal/config"
 )
 
 // TokenType represents the type of OAuth token.
@@ -46,18 +46,18 @@ type Provider struct {
 	cfg        *config.Config
 	signingKey []byte
 
-	mu             sync.RWMutex
-	authCodes      map[string]*authCodeEntry
-	accessTokens   map[string]*TokenInfo
-	refreshTokens  map[string]*TokenInfo
-	clients        map[string]*clientInfo
+	mu            sync.RWMutex
+	authCodes     map[string]*authCodeEntry
+	accessTokens  map[string]*TokenInfo
+	refreshTokens map[string]*TokenInfo
+	clients       map[string]*clientInfo
 }
 
 type authCodeEntry struct {
-	ClientID    string
+	ClientID      string
 	CodeChallenge string
-	ExpiresAt   time.Time
-	Scopes      []string
+	ExpiresAt     time.Time
+	Scopes        []string
 }
 
 type clientInfo struct {
@@ -190,29 +190,30 @@ func (p *Provider) ExchangeCode(code, codeVerifier string) (*TokenInfo, *TokenIn
 	return accessToken, refreshToken, nil
 }
 
-// RefreshAccessToken creates a new access token from a refresh token.
-func (p *Provider) RefreshAccessToken(refreshTokenStr string) (*TokenInfo, error) {
+// RefreshAccessToken rotates a refresh token and returns both replacement
+// tokens. Returning the new refresh token is required: the old one is deleted
+// below and must never be reused by the client.
+func (p *Provider) RefreshAccessToken(refreshTokenStr string) (*TokenInfo, *TokenInfo, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
 	info, ok := p.refreshTokens[refreshTokenStr]
 	if !ok {
-		return nil, fmt.Errorf("invalid refresh token")
+		return nil, nil, fmt.Errorf("invalid refresh token")
 	}
 
 	if time.Now().After(info.ExpiresAt) {
 		delete(p.refreshTokens, refreshTokenStr)
-		return nil, fmt.Errorf("refresh token expired")
+		return nil, nil, fmt.Errorf("refresh token expired")
 	}
 
 	// Rotate refresh token
 	delete(p.refreshTokens, refreshTokenStr)
 
 	newAccessToken := p.createAccessToken(info.ClientID, info.Scopes)
-	// Create new refresh token for next rotation
-	p.createRefreshToken(info.ClientID, info.Scopes)
+	newRefreshToken := p.createRefreshToken(info.ClientID, info.Scopes)
 
-	return newAccessToken, nil
+	return newAccessToken, newRefreshToken, nil
 }
 
 // VerifyAccessToken validates an access token.
@@ -375,17 +376,18 @@ func (p *Provider) HandleToken(w http.ResponseWriter, r *http.Request) {
 	case "refresh_token":
 		refreshTokenStr := r.FormValue("refresh_token")
 
-		accessToken, err := p.RefreshAccessToken(refreshTokenStr)
+		accessToken, refreshToken, err := p.RefreshAccessToken(refreshTokenStr)
 		if err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 			return
 		}
 
 		writeJSON(w, http.StatusOK, map[string]interface{}{
-			"access_token": accessToken.Token,
-			"token_type":   "bearer",
-			"expires_in":   int(time.Until(accessToken.ExpiresAt).Seconds()),
-			"scope":        strings.Join(accessToken.Scopes, " "),
+			"access_token":  accessToken.Token,
+			"token_type":    "bearer",
+			"expires_in":    int(time.Until(accessToken.ExpiresAt).Seconds()),
+			"refresh_token": refreshToken.Token,
+			"scope":         strings.Join(accessToken.Scopes, " "),
 		})
 
 	default:
@@ -425,6 +427,7 @@ func (p *Provider) HandleProtectedResourceMetadata(w http.ResponseWriter, r *htt
 		"resource":                 baseURL + "/mcp",
 		"authorization_servers":    []string{baseURL},
 		"bearer_methods_supported": []string{"header"},
+		"scopes_supported":         p.cfg.OAuth.Scopes,
 		"resource_documentation":   baseURL + "/docs",
 	}
 
@@ -475,11 +478,11 @@ func (p *Provider) HandleRegister(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusCreated, map[string]interface{}{
-		"client_id":              client.ClientID,
-		"client_secret":          client.ClientSecret,
-		"redirect_uris":          client.RedirectURIs,
+		"client_id":                  client.ClientID,
+		"client_secret":              client.ClientSecret,
+		"redirect_uris":              client.RedirectURIs,
 		"token_endpoint_auth_method": "none",
-		"grant_types":            []string{"authorization_code", "refresh_token"},
+		"grant_types":                []string{"authorization_code", "refresh_token"},
 	})
 }
 
@@ -581,30 +584,41 @@ func (p *Provider) AuthMiddleware(next http.Handler) http.Handler {
 
 		tokenStr, err := ExtractBearerToken(r)
 		if err != nil {
-			writeJSON(w, http.StatusUnauthorized, map[string]string{
-				"jsonrpc": "2.0",
-				"error":   err.Error(),
-				"id":      "null",
-			})
+			p.writeUnauthorized(w, r, "invalid_request", err.Error())
 			return
 		}
 
 		claims, err := p.VerifyAccessToken(tokenStr)
 		if err != nil {
-			writeJSON(w, http.StatusUnauthorized, map[string]interface{}{
-				"jsonrpc": "2.0",
-				"error": map[string]interface{}{
-					"code":    -32001,
-					"message": "Unauthorized: " + err.Error(),
-				},
-				"id": nil,
-			})
+			p.writeUnauthorized(w, r, "invalid_token", err.Error())
 			return
 		}
 
 		// Store claims in context
 		_ = claims
 		next.ServeHTTP(w, r)
+	})
+}
+
+// writeUnauthorized returns the OAuth challenge ChatGPT needs to discover the
+// protected-resource metadata and reconnect after an access token expires.
+func (p *Provider) writeUnauthorized(w http.ResponseWriter, r *http.Request, oauthError, description string) {
+	metadataURL := p.baseURLFromRequest(r) + "/.well-known/oauth-protected-resource/mcp"
+	challenge := fmt.Sprintf(
+		`Bearer resource_metadata=%q, scope=%q, error=%q, error_description=%q`,
+		metadataURL,
+		strings.Join(p.cfg.OAuth.Scopes, " "),
+		oauthError,
+		description,
+	)
+	w.Header().Set("WWW-Authenticate", challenge)
+	writeJSON(w, http.StatusUnauthorized, map[string]interface{}{
+		"jsonrpc": "2.0",
+		"error": map[string]interface{}{
+			"code":    -32001,
+			"message": "Unauthorized: " + description,
+		},
+		"id": nil,
 	})
 }
 

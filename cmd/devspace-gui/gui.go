@@ -16,8 +16,8 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 
-	devconfig "github.com/waishnav/mcp-webcoder/internal/config"
-	"github.com/waishnav/mcp-webcoder/internal/locales"
+	devconfig "github.com/snakex21/devspace-go/internal/config"
+	"github.com/snakex21/devspace-go/internal/locales"
 )
 
 // --- All available languages ---

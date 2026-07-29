@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/waishnav/mcp-webcoder/internal/config"
+	"github.com/snakex21/devspace-go/internal/config"
 )
 
 func main() {

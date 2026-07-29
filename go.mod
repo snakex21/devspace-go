@@ -1,4 +1,4 @@
-module github.com/waishnav/mcp-webcoder
+module github.com/snakex21/devspace-go
 
 go 1.26.2
 

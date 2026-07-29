@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/waishnav/mcp-webcoder/internal/config"
-	"github.com/waishnav/mcp-webcoder/internal/locales"
-	"github.com/waishnav/mcp-webcoder/internal/server"
+	"github.com/snakex21/devspace-go/internal/config"
+	"github.com/snakex21/devspace-go/internal/locales"
+	"github.com/snakex21/devspace-go/internal/server"
 )
 
 func main() {

@@ -169,8 +169,8 @@ Set `"shell"` in config.json or choose in the GUI.
 ## Building from Source
 
 ```bash
-git clone https://github.com/snakex21/mcp-webcoder
-cd mcp-webcoder
+git clone https://github.com/snakex21/devspace-go
+cd devspace-go
 
 # Build everything (all platforms)
 .\scripts\windows\build.ps1     # Windows

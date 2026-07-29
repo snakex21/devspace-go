@@ -16,12 +16,12 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/rs/zerolog/log"
-	"github.com/waishnav/mcp-webcoder/internal/auth"
-	"github.com/waishnav/mcp-webcoder/internal/config"
-	"github.com/waishnav/mcp-webcoder/internal/logger"
-	"github.com/waishnav/mcp-webcoder/internal/store"
-	"github.com/waishnav/mcp-webcoder/internal/tools"
-	"github.com/waishnav/mcp-webcoder/internal/workspace"
+	"github.com/snakex21/devspace-go/internal/auth"
+	"github.com/snakex21/devspace-go/internal/config"
+	"github.com/snakex21/devspace-go/internal/logger"
+	"github.com/snakex21/devspace-go/internal/store"
+	"github.com/snakex21/devspace-go/internal/tools"
+	"github.com/snakex21/devspace-go/internal/workspace"
 )
 
 // boolPtr returns a pointer to the given bool value (for ToolAnnotations pointer fields).
@@ -31,6 +31,7 @@ func boolPtr(b bool) *bool { return &b }
 type Server struct {
 	cfg        *config.Config
 	httpServer *http.Server
+	tunnelStop context.CancelFunc
 	provider   *auth.Provider
 	registry   *workspace.Registry
 	store      *store.Store
@@ -71,19 +72,17 @@ func (s *Server) Start() error {
 
 	// OAuth endpoints
 	mux.HandleFunc("/.well-known/oauth-authorization-server", s.provider.HandleOAuthMetadata)
+	mux.HandleFunc("/.well-known/oauth-protected-resource", s.provider.HandleProtectedResourceMetadata)
 	mux.HandleFunc("/.well-known/oauth-protected-resource/mcp", s.provider.HandleProtectedResourceMetadata)
 	mux.HandleFunc("/authorize", s.provider.HandleAuthorize)
 	mux.HandleFunc("/token", s.provider.HandleToken)
 	mux.HandleFunc("/revoke", s.provider.HandleRevoke)
 	mux.HandleFunc("/register", s.provider.HandleRegister)
 
-	// MCP endpoint using StreamableHTTPHandler
-	handler := mcp.NewStreamableHTTPHandler(
-		func(r *http.Request) *mcp.Server {
-			return s.createMcpServer()
-		},
-		&mcp.StreamableHTTPOptions{DisableLocalhostProtection: true},
-	)
+	// MCP endpoint using stateless Streamable HTTP. Workspace state is tracked
+	// separately by workspaceId, so transport sessions only add another failure
+	// mode when a proxy or web client drops an Mcp-Session-Id between requests.
+	handler := s.streamableMCPHandler()
 
 	mux.Handle("/mcp", handler)
 
@@ -128,6 +127,9 @@ func (s *Server) Start() error {
 		if err := s.httpServer.Shutdown(ctx); err != nil {
 			log.Error().Err(err).Msg("server shutdown error")
 		}
+		if s.tunnelStop != nil {
+			s.tunnelStop()
+		}
 		if s.store != nil {
 			s.store.Close()
 		}
@@ -155,6 +157,19 @@ func (s *Server) Start() error {
 
 	<-idleConnsClosed
 	return nil
+}
+
+func (s *Server) streamableMCPHandler() http.Handler {
+	return mcp.NewStreamableHTTPHandler(
+		func(r *http.Request) *mcp.Server {
+			return s.createMcpServer()
+		},
+		&mcp.StreamableHTTPOptions{
+			Stateless:                  true,
+			JSONResponse:               true,
+			DisableLocalhostProtection: true,
+		},
+	)
 }
 
 // startTunnel attempts to start a tunnel to expose the server publicly.
@@ -238,6 +253,7 @@ func (s *Server) startPinggy() string {
 
 	select {
 	case url := <-done:
+		s.tunnelStop = cancel
 		printTunnelURL(url)
 		return url
 	case <-time.After(15 * time.Second):
@@ -301,6 +317,7 @@ func (s *Server) startCloudflared() string {
 
 	select {
 	case url := <-done:
+		s.tunnelStop = cancel
 		printTunnelURL(url)
 		return url
 	case <-time.After(10 * time.Second):

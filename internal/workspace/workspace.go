@@ -8,8 +8,8 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
-	"github.com/waishnav/mcp-webcoder/internal/config"
-	"github.com/waishnav/mcp-webcoder/internal/store"
+	"github.com/snakex21/devspace-go/internal/config"
+	"github.com/snakex21/devspace-go/internal/store"
 )
 
 // Mode represents workspace opening mode.
