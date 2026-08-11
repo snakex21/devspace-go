@@ -112,18 +112,11 @@ func (gw *guiWidgets) rebuildForm() {
 }
 
 // runGUI launches the desktop GUI configurator.
-func runGUI() {
-	a := app.NewWithID("com.mcp-webcoder.configurator")
+func runGUI(cfg *devconfig.Config) {
+	// The GUI stores its configuration next to the executable. An empty Fyne
+	// app ID keeps unused framework preferences in memory instead of AppData.
+	a := app.NewWithID("")
 	a.Settings().SetTheme(theme.DarkTheme())
-
-	cfg := devconfig.LoadConfig() // load existing config with defaults
-
-	// Init locales with current language
-	lang := cfg.Lang
-	if lang == "" || lang == "auto" {
-		lang = "en"
-	}
-	locales.Init(lang)
 
 	w := a.NewWindow(locales.T("gui.title"))
 	w.Resize(fyne.NewSize(640, 680))
@@ -248,11 +241,6 @@ func runGUI() {
 			fmt.Sprintf(locales.T("gui.saved_msg"), cfg.ConfigDir),
 			w,
 		)
-
-		// Update locales if language changed
-		if langSelect.Selected != lang {
-			locales.SetLocale(langSelect.Selected)
-		}
 	})
 	gw.saveBtn = saveBtn
 
