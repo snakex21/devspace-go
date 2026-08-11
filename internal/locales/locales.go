@@ -89,28 +89,22 @@ func SetLocale(lang string) {
 }
 
 // T returns a translated string for the given key.
+// Missing entries fall back to English before falling back to the key itself.
 // Optional args are passed to fmt.Sprintf for formatting.
 func T(key string, args ...interface{}) string {
 	mu.RLock()
 	locale := stringsMap[currentLocale]
+	english := stringsMap["en"]
 	mu.RUnlock()
 
-	if locale == nil {
-		// fallback to English
-		mu.RLock()
-		locale = stringsMap["en"]
-		mu.RUnlock()
+	str := ""
+	if locale != nil {
+		str = locale[key]
 	}
-	if locale == nil {
-		if len(args) > 0 {
-			return fmt.Sprintf(key, args...)
-		}
-		return key
+	if str == "" && english != nil {
+		str = english[key]
 	}
-
-	str, ok := locale[key]
-	if !ok {
-		// fallback to key itself
+	if str == "" {
 		str = key
 	}
 
