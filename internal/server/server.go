@@ -28,6 +28,8 @@ import (
 // boolPtr returns a pointer to the given bool value (for ToolAnnotations pointer fields).
 func boolPtr(b bool) *bool { return &b }
 
+const cloudflaredURLTimeout = 30 * time.Second
+
 // Server represents the running MCP WebCoder server.
 type Server struct {
 	cfg        *config.Config
@@ -297,7 +299,7 @@ func (s *Server) startCloudflared() string {
 		s.tunnelStop = cancel
 		printTunnelURL(url)
 		return url
-	case <-time.After(10 * time.Second):
+	case <-time.After(cloudflaredURLTimeout):
 		fmt.Printf("⚠️  %s\n", locales.T("tunnel.cloudflared_timeout"))
 		cancel()
 		return ""
