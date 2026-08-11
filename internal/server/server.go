@@ -13,10 +13,12 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"unicode/utf8"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/rs/zerolog/log"
 	"github.com/snakex21/devspace-go/internal/config"
+	"github.com/snakex21/devspace-go/internal/locales"
 	"github.com/snakex21/devspace-go/internal/logger"
 	"github.com/snakex21/devspace-go/internal/store"
 	"github.com/snakex21/devspace-go/internal/tools"
@@ -95,7 +97,7 @@ func (s *Server) Start() error {
 		signal.Notify(sigint, os.Interrupt, syscall.SIGTERM)
 		<-sigint
 
-		log.Info().Msg("shutting down server...")
+		log.Info().Msg(locales.T("server.shutdown"))
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
@@ -114,17 +116,17 @@ func (s *Server) Start() error {
 	log.Info().
 		Str("host", s.cfg.Host).
 		Int("port", s.cfg.Port).
-		Msg("webcoder listening")
+		Msg(locales.T("server.listening"))
 
 	log.Info().
 		Strs("allowed_roots", s.cfg.AllowedRoots).
-		Msg("allowed roots")
+		Msg(locales.T("server.roots"))
 
 	log.Info().
 		Bool("skills", s.cfg.SkillsEnabled).
 		Str("tool_mode", string(s.cfg.ToolMode)).
 		Str("tool_naming", string(s.cfg.ToolNaming)).
-		Msg("configuration")
+		Msg(locales.T("server.config"))
 
 	if err := s.httpServer.ListenAndServe(); err != http.ErrServerClosed {
 		return fmt.Errorf("server error: %w", err)
@@ -173,7 +175,7 @@ func (s *Server) startPinggy() string {
 	}
 
 	fmt.Println()
-	fmt.Println("🔗  Uruchamiam tunel pinggy (stały URL)...")
+	fmt.Printf("🔗  %s\n", locales.T("tunnel.starting_pinggy"))
 	fmt.Println()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -190,7 +192,7 @@ func (s *Server) startPinggy() string {
 	stderrPipe, _ := cmd.StderrPipe()
 
 	if err := cmd.Start(); err != nil {
-		fmt.Printf("⚠️  Nie można uruchomić pinggy: %v\n", err)
+		fmt.Printf("⚠️  %s (pinggy): %v\n", locales.T("error.cmd_failed"), err)
 		cancel()
 		return ""
 	}
@@ -232,7 +234,7 @@ func (s *Server) startPinggy() string {
 		printTunnelURL(url)
 		return url
 	case <-time.After(15 * time.Second):
-		fmt.Println("⚠️  pinggy nie zwrócił URL — próbuję cloudflared...")
+		fmt.Printf("⚠️  %s\n", locales.T("tunnel.pinggy_timeout"))
 		cancel()
 		return ""
 	}
@@ -246,7 +248,7 @@ func (s *Server) startCloudflared() string {
 	}
 
 	fmt.Println()
-	fmt.Println("🔗  Uruchamiam tunel cloudflared...")
+	fmt.Printf("🔗  %s\n", locales.T("tunnel.starting_cloudflared"))
 	fmt.Printf("    %s\n", tunnelExe)
 	fmt.Println()
 
@@ -257,7 +259,7 @@ func (s *Server) startCloudflared() string {
 	stderrPipe, _ := cmd.StderrPipe()
 
 	if err := cmd.Start(); err != nil {
-		fmt.Printf("⚠️  Nie można uruchomić cloudflared: %v\n", err)
+		fmt.Printf("⚠️  %s (cloudflared): %v\n", locales.T("error.cmd_failed"), err)
 		cancel()
 		return ""
 	}
@@ -296,7 +298,7 @@ func (s *Server) startCloudflared() string {
 		printTunnelURL(url)
 		return url
 	case <-time.After(10 * time.Second):
-		fmt.Println("⚠️  cloudflared nie zwrócił URL — serwer działa tylko lokalnie")
+		fmt.Printf("⚠️  %s\n", locales.T("tunnel.cloudflared_timeout"))
 		cancel()
 		return ""
 	}
@@ -346,16 +348,29 @@ func findCloudflaredExecutable() string {
 func printTunnelURL(url string) {
 	mcpURL := url + "/mcp"
 	sseURL := url + "/sse"
+	lines := []string{
+		"🌐 " + locales.T("tunnel.active"),
+		mcpURL,
+		sseURL,
+		"",
+		locales.T("tunnel.paste_chatgpt"),
+		mcpURL,
+		locales.T("tunnel.try_sse"),
+	}
+	width := 54
+	for _, line := range lines {
+		if lineWidth := utf8.RuneCountInString(line); lineWidth > width {
+			width = lineWidth
+		}
+	}
+
 	fmt.Println()
-	fmt.Println("╔══════════════════════════════════════════════════════════╗")
-	fmt.Println("║  🌐 TUNEL AKTYWNY                                       ║")
-	fmt.Printf("║  %-54s ║\n", mcpURL)
-	fmt.Printf("║  %-54s ║\n", sseURL)
-	fmt.Println("║                                                          ║")
-	fmt.Println("║  Wklej w ChatGPT jako adres serwera MCP:                 ║")
-	fmt.Printf("║  %-54s ║\n", mcpURL)
-	fmt.Println("║  Jeśli ChatGPT marudzi, użyj wersji /sse.                ║")
-	fmt.Println("╚══════════════════════════════════════════════════════════╝")
+	fmt.Printf("╔%s╗\n", strings.Repeat("═", width+4))
+	for _, line := range lines {
+		padding := strings.Repeat(" ", width-utf8.RuneCountInString(line))
+		fmt.Printf("║  %s%s  ║\n", line, padding)
+	}
+	fmt.Printf("╚%s╝\n", strings.Repeat("═", width+4))
 	fmt.Println()
 }
 

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"net/http"
 	"net/http/httptest"
@@ -8,12 +9,76 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/snakex21/devspace-go/internal/config"
+	"github.com/snakex21/devspace-go/internal/locales"
 	"github.com/snakex21/devspace-go/internal/workspace"
 )
+
+func captureTunnelOutput(t *testing.T, lang string) string {
+	t.Helper()
+	locales.Init(lang)
+	originalStdout := os.Stdout
+	reader, writer, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.Stdout = writer
+	t.Cleanup(func() { os.Stdout = originalStdout })
+
+	printTunnelURL("https://example.trycloudflare.com")
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	os.Stdout = originalStdout
+
+	var output bytes.Buffer
+	if _, err := output.ReadFrom(reader); err != nil {
+		t.Fatal(err)
+	}
+	if err := reader.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return output.String()
+}
+
+func TestTunnelOutputUsesSelectedLocale(t *testing.T) {
+	tests := []struct {
+		lang       string
+		expected   []string
+		unexpected []string
+	}{
+		{
+			lang:       "en",
+			expected:   []string{"TUNNEL ACTIVE", "Paste this in ChatGPT", "try the /sse version"},
+			unexpected: []string{"TUNEL AKTYWNY", "Wklej w ChatGPT", "Jeśli ChatGPT"},
+		},
+		{
+			lang:       "de",
+			expected:   []string{"TUNNEL AKTIV", "Füge dies in ChatGPT", "versuche die /sse-Version"},
+			unexpected: []string{"TUNEL AKTYWNY", "Paste this in ChatGPT"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.lang, func(t *testing.T) {
+			text := captureTunnelOutput(t, test.lang)
+			for _, expected := range test.expected {
+				if !strings.Contains(text, expected) {
+					t.Fatalf("tunnel output does not contain %q:\n%s", expected, text)
+				}
+			}
+			for _, unexpected := range test.unexpected {
+				if strings.Contains(text, unexpected) {
+					t.Fatalf("tunnel output unexpectedly contains %q:\n%s", unexpected, text)
+				}
+			}
+		})
+	}
+}
 
 type roundTripFunc func(*http.Request) (*http.Response, error)
 
