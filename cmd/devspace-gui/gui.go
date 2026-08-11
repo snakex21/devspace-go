@@ -31,6 +31,35 @@ var langCodes = []string{
 
 var shellOptions = []string{"auto", "powershell", "cmd", "bash", "sh"}
 
+const (
+	folderDialogScale     = float32(0.75)
+	folderDialogMinWidth  = float32(640)
+	folderDialogMinHeight = float32(480)
+	folderDialogMaxWidth  = float32(1200)
+	folderDialogMaxHeight = float32(800)
+)
+
+func folderDialogSize(parent fyne.Size) fyne.Size {
+	return fyne.NewSize(
+		scaledDialogDimension(parent.Width, folderDialogMinWidth, folderDialogMaxWidth),
+		scaledDialogDimension(parent.Height, folderDialogMinHeight, folderDialogMaxHeight),
+	)
+}
+
+func scaledDialogDimension(parent, minimum, maximum float32) float32 {
+	size := parent * folderDialogScale
+	if size < minimum {
+		size = minimum
+	}
+	if size > maximum {
+		size = maximum
+	}
+	if parent > 0 && size > parent {
+		size = parent
+	}
+	return size
+}
+
 // guiWidgets holds references to all translatable widgets.
 type guiWidgets struct {
 	window      fyne.Window
@@ -144,7 +173,7 @@ func runGUI(cfg *devconfig.Config) {
 	rootsEntry.SetPlaceHolder(locales.T("gui.roots_placeholder"))
 
 	browseBtn := widget.NewButtonWithIcon(locales.T("gui.browse"), theme.FolderOpenIcon(), func() {
-		dialog.ShowFolderOpen(func(uri fyne.ListableURI, err error) {
+		folderDialog := dialog.NewFolderOpen(func(uri fyne.ListableURI, err error) {
 			if err != nil || uri == nil {
 				return
 			}
@@ -160,6 +189,8 @@ func runGUI(cfg *devconfig.Config) {
 				rootsEntry.SetText(current + "; " + path)
 			}
 		}, w)
+		folderDialog.Resize(folderDialogSize(w.Canvas().Size()))
+		folderDialog.Show()
 	})
 
 	urlEntry := widget.NewEntry()
