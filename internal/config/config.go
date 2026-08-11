@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -160,14 +159,6 @@ func LoadConfig() *Config {
 	if v := os.Getenv("WEBCODER_LANG"); v != "" {
 		cfg.Lang = v
 	}
-	// Resolve "auto" to system language
-	if cfg.Lang == "auto" || cfg.Lang == "" {
-		if detected := detectSystemLang(); detected != "" {
-			cfg.Lang = detected
-		} else {
-			cfg.Lang = "en"
-		}
-	}
 	if v := os.Getenv("WEBCODER_WIDGETS"); v != "" {
 		cfg.Widgets = WidgetMode(v)
 	}
@@ -296,6 +287,16 @@ func LoadConfig() *Config {
 		}
 	}
 
+	// Resolve "auto" only after all sources have been merged. This avoids an
+	// unnecessary OS lookup when the config file already specifies a language.
+	if cfg.Lang == "auto" || cfg.Lang == "" {
+		if detected := detectSystemLang(); detected != "" {
+			cfg.Lang = detected
+		} else {
+			cfg.Lang = "en"
+		}
+	}
+
 	return cfg
 }
 
@@ -350,44 +351,15 @@ func exeDir() string {
 // detectSystemLang tries to detect the OS language.
 // Returns a 2-letter code like "pl", "en", "de" or empty string.
 func detectSystemLang() string {
-	// Check LANG env (Linux/macOS)
+	// Environment variables take precedence on every platform.
+	if lang := os.Getenv("LC_ALL"); len(lang) >= 2 {
+		return strings.ToLower(lang[:2])
+	}
 	if lang := os.Getenv("LANG"); lang != "" {
 		if len(lang) >= 2 {
 			return strings.ToLower(lang[:2])
 		}
 	}
-	if lang := os.Getenv("LC_ALL"); lang != "" {
-		if len(lang) >= 2 {
-			return strings.ToLower(lang[:2])
-		}
-	}
 
-	// On Windows, try PowerShell
-	if runtime.GOOS == "windows" {
-		cmd := execCmd("powershell.exe", "-NoProfile", "-Command", "(Get-Culture).TwoLetterISOLanguageName")
-		out, err := cmd.Output()
-		if err == nil {
-			code := strings.TrimSpace(string(out))
-			if len(code) == 2 {
-				return strings.ToLower(code)
-			}
-		}
-	}
-
-	return ""
-}
-
-// execCmd runs a command and returns the Cmd for reading output.
-func execCmd(name string, args ...string) *execCmdResult {
-	return &execCmdResult{name: name, args: args}
-}
-
-type execCmdResult struct {
-	name string
-	args []string
-}
-
-func (c *execCmdResult) Output() ([]byte, error) {
-	cmd := exec.Command(c.name, c.args...)
-	return cmd.Output()
+	return detectOSSystemLang()
 }
