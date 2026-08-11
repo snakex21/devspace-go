@@ -80,6 +80,65 @@ func TestTunnelOutputUsesSelectedLocale(t *testing.T) {
 	}
 }
 
+func TestStartTunnelRetriesCloudflaredBeforePinggy(t *testing.T) {
+	cfg := config.DefaultConfig()
+	server := &Server{cfg: cfg}
+
+	cloudflaredCalls := 0
+	pinggyCalls := 0
+	url := server.startTunnelWithProviders(
+		func() string {
+			cloudflaredCalls++
+			if cloudflaredCalls == cloudflaredMaxAttempts {
+				return "https://example.trycloudflare.com"
+			}
+			return ""
+		},
+		func() string {
+			pinggyCalls++
+			return "https://example.pinggy.link"
+		},
+	)
+
+	if url != "https://example.trycloudflare.com" {
+		t.Fatalf("startTunnelWithProviders returned %q", url)
+	}
+	if cloudflaredCalls != cloudflaredMaxAttempts {
+		t.Fatalf("cloudflared called %d times, want %d", cloudflaredCalls, cloudflaredMaxAttempts)
+	}
+	if pinggyCalls != 0 {
+		t.Fatalf("pinggy called %d times after cloudflared succeeded", pinggyCalls)
+	}
+}
+
+func TestStartTunnelFallsBackToPinggyAfterCloudflaredRetries(t *testing.T) {
+	cfg := config.DefaultConfig()
+	server := &Server{cfg: cfg}
+
+	cloudflaredCalls := 0
+	pinggyCalls := 0
+	url := server.startTunnelWithProviders(
+		func() string {
+			cloudflaredCalls++
+			return ""
+		},
+		func() string {
+			pinggyCalls++
+			return "https://example.pinggy.link"
+		},
+	)
+
+	if url != "https://example.pinggy.link" {
+		t.Fatalf("startTunnelWithProviders returned %q", url)
+	}
+	if cloudflaredCalls != cloudflaredMaxAttempts {
+		t.Fatalf("cloudflared called %d times, want %d", cloudflaredCalls, cloudflaredMaxAttempts)
+	}
+	if pinggyCalls != 1 {
+		t.Fatalf("pinggy called %d times, want 1", pinggyCalls)
+	}
+}
+
 type roundTripFunc func(*http.Request) (*http.Response, error)
 
 func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {

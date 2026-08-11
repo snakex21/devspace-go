@@ -28,7 +28,10 @@ import (
 // boolPtr returns a pointer to the given bool value (for ToolAnnotations pointer fields).
 func boolPtr(b bool) *bool { return &b }
 
-const cloudflaredURLTimeout = 30 * time.Second
+const (
+	cloudflaredURLTimeout  = 30 * time.Second
+	cloudflaredMaxAttempts = 2
+)
 
 // Server represents the running MCP WebCoder server.
 type Server struct {
@@ -155,16 +158,21 @@ func (s *Server) streamableMCPHandler() http.Handler {
 // Tries cloudflared first, falls back to pinggy.
 // Returns the public URL if successful. Non-fatal.
 func (s *Server) startTunnel() string {
-	// Try cloudflared first
-	if url := s.startCloudflared(); url != "" {
+	return s.startTunnelWithProviders(s.startCloudflared, s.startPinggy)
+}
+
+func (s *Server) startTunnelWithProviders(startCloudflared, startPinggy func() string) string {
+	for attempt := 0; attempt < cloudflaredMaxAttempts; attempt++ {
+		if url := startCloudflared(); url != "" {
+			return url
+		}
+	}
+
+	if url := startPinggy(); url != "" {
 		return url
 	}
 
-	// Fallback to pinggy
-	if url := s.startPinggy(); url != "" {
-		return url
-	}
-
+	fmt.Printf("⚠️  %s\n", locales.T("tunnel.cloudflared_timeout"))
 	return ""
 }
 
@@ -236,7 +244,6 @@ func (s *Server) startPinggy() string {
 		printTunnelURL(url)
 		return url
 	case <-time.After(15 * time.Second):
-		fmt.Printf("⚠️  %s\n", locales.T("tunnel.pinggy_timeout"))
 		cancel()
 		return ""
 	}
@@ -300,7 +307,6 @@ func (s *Server) startCloudflared() string {
 		printTunnelURL(url)
 		return url
 	case <-time.After(cloudflaredURLTimeout):
-		fmt.Printf("⚠️  %s\n", locales.T("tunnel.cloudflared_timeout"))
 		cancel()
 		return ""
 	}
