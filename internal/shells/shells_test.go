@@ -3,6 +3,7 @@ package shells
 import (
 	"errors"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -27,7 +28,7 @@ func (f fakeSystem) prober() prober {
 		},
 		exists: func(path string) bool {
 			for _, file := range f.files {
-				if strings.EqualFold(filepath.Clean(file), filepath.Clean(path)) {
+				if samePath(file, path) {
 					return true
 				}
 			}
@@ -43,6 +44,27 @@ func windowsEnv() map[string]string {
 		"SystemRoot":   `C:\Windows`,
 		"ProgramFiles": `C:\Program Files`,
 		"LOCALAPPDATA": `C:\Users\dev\AppData\Local`,
+	}
+}
+
+// samePath compares paths the way the fixtures mean them. Windows fixtures are
+// written with backslashes, but filepath.Join on a POSIX runner joins with a
+// forward slash, so a literal comparison would miss a file that is really there.
+func samePath(a, b string) bool {
+	return strings.EqualFold(normalizeSeparators(a), normalizeSeparators(b))
+}
+
+func normalizeSeparators(path string) string {
+	return filepath.ToSlash(filepath.Clean(strings.ReplaceAll(path, `\`, "/")))
+}
+
+// requireWindowsHost guards the cases that need the host filepath package to
+// understand backslashes and drive letters. Those branches only ever run on
+// Windows, and the windows job in CI exercises them.
+func requireWindowsHost(t *testing.T) {
+	t.Helper()
+	if runtime.GOOS != "windows" {
+		t.Skip("windows path semantics; covered by the windows CI job")
 	}
 }
 
@@ -107,7 +129,7 @@ func TestDetectFindsGitShellsThatAreNotOnPath(t *testing.T) {
 	found := detect(system.prober())
 
 	assertIDs(t, found, "powershell", "bash", "sh")
-	if bash := find(t, found, "bash"); bash.Path != `C:\Program Files\Git\bin\bash.exe` {
+	if bash := find(t, found, "bash"); !samePath(bash.Path, `C:\Program Files\Git\bin\bash.exe`) {
 		t.Fatalf("bash path is %q", bash.Path)
 	}
 }
@@ -168,6 +190,8 @@ func TestDetectReportsNothingOnABareMachine(t *testing.T) {
 // TestDetectMarksWindowsWslBash covers the System32 bash.exe launcher, which
 // runs inside WSL and does not see the Windows working directory.
 func TestDetectMarksWindowsWslBash(t *testing.T) {
+	requireWindowsHost(t)
+
 	system := fakeSystem{
 		goos:  "windows",
 		path:  map[string]string{"bash.exe": `C:\Windows\System32\bash.exe`},
@@ -226,6 +250,8 @@ func TestResolveSeparatesUnknownFromUnavailable(t *testing.T) {
 }
 
 func TestResolveHonoursAnExplicitPath(t *testing.T) {
+	requireWindowsHost(t)
+
 	system := fakeSystem{
 		goos:  "windows",
 		files: []string{`C:\Program Files\Git\bin\bash.exe`},
