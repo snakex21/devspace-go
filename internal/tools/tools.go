@@ -32,6 +32,18 @@ var skippedDirs = map[string]bool{
 	"tools": true,
 }
 
+var unixSkippedDirs = map[string]bool{
+	".android":  true,
+	".bun":      true,
+	".config":   true,
+	".gradle":   true,
+	".hermes":   true,
+	".local":    true,
+	".npm":      true,
+	".opencode": true,
+	".var":      true,
+}
+
 var configuredShell = "auto"
 
 // SetShell configures the shell used by the bash tool.
@@ -392,7 +404,7 @@ func GrepFiles(ctx context.Context, req *mcp.CallToolRequest, input GrepInput, w
 			return filepath.SkipAll
 		}
 		if info.IsDir() {
-			if skippedDirs[info.Name()] {
+			if shouldSkipToolDirectory(path, searchPath, info.Name(), runtime.GOOS) {
 				return filepath.SkipDir
 			}
 			return nil
@@ -479,7 +491,7 @@ func FindFiles(ctx context.Context, req *mcp.CallToolRequest, input GlobInput, w
 			return filepath.SkipAll
 		}
 		if info.IsDir() {
-			if skippedDirs[info.Name()] {
+			if shouldSkipToolDirectory(path, searchPath, info.Name(), runtime.GOOS) {
 				return filepath.SkipDir
 			}
 			return nil
@@ -596,36 +608,7 @@ func RunBash(ctx context.Context, req *mcp.CallToolRequest, input BashInput, wsR
 		}
 	}
 
-	var cmdName string
-	var cmdArgs []string
-	preferredShell := configuredShell
-
-	if runtime.GOOS == "windows" {
-		switch preferredShell {
-		case "cmd", "cmd.exe":
-			cmdName = "cmd.exe"
-			cmdArgs = []string{"/C", input.Command}
-		case "powershell", "powershell.exe", "pwsh":
-			if preferredShell == "pwsh" {
-				cmdName = "pwsh"
-			} else {
-				cmdName = "powershell.exe"
-			}
-			cmdArgs = []string{"-NoProfile", "-NonInteractive", "-Command", input.Command}
-		default:
-			cmdName = "powershell.exe"
-			cmdArgs = []string{"-NoProfile", "-NonInteractive", "-Command", input.Command}
-		}
-	} else {
-		if preferredShell == "sh" {
-			cmdName = "sh"
-		} else if preferredShell != "" {
-			cmdName = preferredShell
-		} else {
-			cmdName = "bash"
-		}
-		cmdArgs = []string{"-c", input.Command}
-	}
+	cmdName, cmdArgs := shellCommandForOS(configuredShell, runtime.GOOS, input.Command)
 
 	output, err := runCommand(ctx, cwd, cmdName, cmdArgs, timeout)
 	if err != nil && output == "" {
@@ -651,6 +634,40 @@ func RunBash(ctx context.Context, req *mcp.CallToolRequest, input BashInput, wsR
 			&mcp.TextContent{Text: result},
 		},
 	}, BashOutput{Result: result}, nil
+}
+
+func shellCommandForOS(preferredShell, goos, command string) (string, []string) {
+	if goos == "windows" {
+		switch preferredShell {
+		case "cmd", "cmd.exe":
+			return "cmd.exe", []string{"/C", command}
+		case "powershell", "powershell.exe", "pwsh":
+			if preferredShell == "pwsh" {
+				return "pwsh", []string{"-NoProfile", "-NonInteractive", "-Command", command}
+			}
+			return "powershell.exe", []string{"-NoProfile", "-NonInteractive", "-Command", command}
+		default:
+			return "powershell.exe", []string{"-NoProfile", "-NonInteractive", "-Command", command}
+		}
+	}
+
+	switch preferredShell {
+	case "", "auto":
+		preferredShell = "bash"
+	case "sh":
+		preferredShell = "sh"
+	}
+	return preferredShell, []string{"-c", command}
+}
+
+func shouldSkipToolDirectory(path, searchRoot, name, goos string) bool {
+	if skippedDirs[name] {
+		return true
+	}
+	if goos == "windows" || !unixSkippedDirs[name] {
+		return false
+	}
+	return filepath.Clean(path) != filepath.Clean(searchRoot)
 }
 
 // --- helpers ---
