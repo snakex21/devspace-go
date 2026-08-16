@@ -1,8 +1,8 @@
-# DevSpace (Edisi Go)
+# Dev Space Go (Edisi Go)
 
 **Berikan ChatGPT & Claude akses selamat ke mesin tempatan anda. Jadikan mana-mana hos MCP sebagai rakan pengekodan anda.**
 
-DevSpace ialah pelayan MCP yang dihos sendiri yang membolehkan pembantu AI membaca, mengedit, mencari dan menjalankan kod dalam projek tempatan sebenar anda — fail anda, alatan anda, terminal anda — tanpa memuat naik apa-apa kepada pihak ketiga. Anda jalankannya pada mesin anda, dedahkannya melalui terowong yang anda kawal.
+Dev Space Go ialah pelayan MCP yang dihos sendiri yang membolehkan pembantu AI membaca, mengedit, mencari dan menjalankan kod dalam projek tempatan sebenar anda — fail anda, alatan anda, terminal anda — tanpa memuat naik apa-apa kepada pihak ketiga. Anda jalankannya pada mesin anda, dedahkannya melalui terowong yang anda kawal.
 
 ---
 
@@ -131,7 +131,7 @@ Tiada pembolehubah persekitaran diperlukan — semuanya dalam fail konfigurasi m
 
 ## Terowong (Akses Jauh)
 
-Untuk ChatGPT versi web (HTTPS diperlukan), DevSpace auto-mulakan terowong:
+Untuk ChatGPT versi web (HTTPS diperlukan), Dev Space Go auto-mulakan terowong:
 
 | Terowong | Jenis URL | Persediaan |
 |---|---|---|

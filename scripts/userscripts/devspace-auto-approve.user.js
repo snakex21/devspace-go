@@ -1,9 +1,9 @@
 // ==UserScript==
-// @name         MCP WebCoder Auto-Approve for ChatGPT
-// @namespace    mcp-webcoder
-// @version      1.1.0
-// @description  Automatycznie klika "Zawsze zezwalaj" / "Połącz" dla MCP WebCoder w ChatGPT.
-// @author       MCP WebCoder
+// @name         Dev Space Go Auto-Approve for ChatGPT
+// @namespace    devspace-go
+// @version      1.2.0
+// @description  Automatycznie klika "Zawsze zezwalaj" / "Połącz" dla Dev Space Go w ChatGPT.
+// @author       Dev Space Go
 // @match        https://chatgpt.com/*
 // @match        https://chat.openai.com/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=chatgpt.com
@@ -14,7 +14,7 @@
 (function () {
     'use strict';
 
-    const LOG_PREFIX = '[MCP WebCoder Auto-Approve]';
+    const LOG_PREFIX = '[Dev Space Go Auto-Approve]';
     const CLICK_DELAY_MS = 180;
     const SCAN_INTERVAL_MS = 350;
 
@@ -101,7 +101,7 @@
         return (
             text.includes('mcp') ||
             text.includes('model context protocol') ||
-            text.includes('mcp webcoder') ||
+            text.includes('dev space go') ||
             text.includes('devspace') ||
             text.includes('zezwolić chatgpt na użycie aplikacji') ||
             text.includes('let chatgpt use') ||
@@ -121,7 +121,7 @@
             text.includes('połącz') ||
             text.includes('authorization') ||
             text.includes('autoryz') ||
-            text.includes('mcp webcoder') ||
+            text.includes('dev space go') ||
             text.includes('devspace')
         );
     }

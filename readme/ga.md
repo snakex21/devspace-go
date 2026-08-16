@@ -1,8 +1,8 @@
-# DevSpace (Go Edition) - Gaeilge
+# Dev Space Go (Go Edition) - Gaeilge
 
 **Tabhair rochtain shlán do ChatGPT & Claude ar do mheaisín áitiúil. Déan comhpháirtí códála d'aon óstach MCP.**
 
-Is freastalaí MCP féin-óstáilte é DevSpace a ligeann do chúntóirí AI cód a léamh, a chur in eagar, a chuardach agus a rith i do fhíor-thionscadail áitiúla — do chomhaid, d'uirlisí, do theirminéal — gan aon rud a uaslódáil chuig tríú páirtí. Rithfidh tú é ar do mheaisín, nochtfaidh tú é trí thollán a rialaíonn tú.
+Is freastalaí MCP féin-óstáilte é Dev Space Go a ligeann do chúntóirí AI cód a léamh, a chur in eagar, a chuardach agus a rith i do fhíor-thionscadail áitiúla — do chomhaid, d'uirlisí, do theirminéal — gan aon rud a uaslódáil chuig tríú páirtí. Rithfidh tú é ar do mheaisín, nochtfaidh tú é trí thollán a rialaíonn tú.
 
 ---
 
@@ -131,7 +131,7 @@ Níl aon athróga timpeallachta de dhíth — tá gach rud sa chomhad cumraíoch
 
 ## Tollán (Rochtain Chianach)
 
-Do leagan gréasáin ChatGPT (HTTPS de dhíth), tosaíonn DevSpace tollán go huathoibríoch:
+Do leagan gréasáin ChatGPT (HTTPS de dhíth), tosaíonn Dev Space Go tollán go huathoibríoch:
 
 | Tollán | Cineál URL | Socrú |
 |---|---|---|

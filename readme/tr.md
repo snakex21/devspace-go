@@ -1,8 +1,8 @@
-# DevSpace (Go Sürümü)
+# Dev Space Go (Go Sürümü)
 
 **ChatGPT ve Claude'a yerel makinenize güvenli erişim verin. Herhangi bir MCP sunucusunu kodlama ortağınıza dönüştürün.**
 
-DevSpace, AI asistanlarının gerçek yerel projelerinizde — dosyalarınız, araçlarınız, terminaliniz — hiçbir şeyi üçüncü taraflara yüklemeden kod okumasına, düzenlemesine, aramasına ve çalıştırmasına olanak tanıyan, kendi kendine barındırılan bir MCP sunucusudur. Kendi makinenizde çalıştırır.
+Dev Space Go, AI asistanlarının gerçek yerel projelerinizde — dosyalarınız, araçlarınız, terminaliniz — hiçbir şeyi üçüncü taraflara yüklemeden kod okumasına, düzenlemesine, aramasına ve çalıştırmasına olanak tanıyan, kendi kendine barındırılan bir MCP sunucusudur. Kendi makinenizde çalıştırır.
 
 ---
 
@@ -131,7 +131,7 @@ Ortam değişkenlerine gerek yok — her şey taşınabilir yapılandırma dosya
 
 ## Tünel (Uzaktan Erişim)
 
-ChatGPT web sürümü için (HTTPS gereklidir), DevSpace otomatik olarak bir tünel başlatır:
+ChatGPT web sürümü için (HTTPS gereklidir), Dev Space Go otomatik olarak bir tünel başlatır:
 
 | Tünel | URL türü | Kurulum |
 |---|---|---|

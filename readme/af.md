@@ -1,8 +1,8 @@
-# DevSpace (Go Edition) - Afrikaans
+# Dev Space Go (Go Edition) - Afrikaans
 
 **Gee ChatGPT & Claude veilige toegang tot jou plaaslike masjien. Verander enige MCP-gasheer in jou kodeermaat.**
 
-DevSpace is 'n self-aangebode MCP-bediener wat KI-assistente toelaat om kode in jou werklike plaaslike projekte te lees, redigeer, soek en uit te voer — jou lêers, jou gereedskap, jou terminaal — sonder om enigiets na 'n derde party op te laai. Jy hardloop dit op jou masjien, stel dit bloot deur 'n tonnel wat jy beheer.
+Dev Space Go is 'n self-aangebode MCP-bediener wat KI-assistente toelaat om kode in jou werklike plaaslike projekte te lees, redigeer, soek en uit te voer — jou lêers, jou gereedskap, jou terminaal — sonder om enigiets na 'n derde party op te laai. Jy hardloop dit op jou masjien, stel dit bloot deur 'n tonnel wat jy beheer.
 
 ---
 
@@ -131,7 +131,7 @@ Geen omgewingsveranderlikes nodig nie — alles is in die draagbare konfigurasie
 
 ## Tonnel (Afstandtoegang)
 
-Vir ChatGPT-webweergawe (HTTPS vereis), begin DevSpace outomaties 'n tonnel:
+Vir ChatGPT-webweergawe (HTTPS vereis), begin Dev Space Go outomaties 'n tonnel:
 
 | Tonnel | URL-tipe | Opstelling |
 |---|---|---|

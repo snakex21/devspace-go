@@ -1,8 +1,8 @@
-# DevSpace (Phiên bản Go)
+# Dev Space Go (Phiên bản Go)
 
 **Cấp cho ChatGPT và Claude quyền truy cập an toàn vào máy tính cục bộ của bạn. Biến bất kỳ máy chủ MCP nào thành đối tác lập trình của bạn.**
 
-DevSpace là một máy chủ MCP tự lưu trữ cho phép trợ lý AI đọc, chỉnh sửa, tìm kiếm và chạy mã trong các dự án cục bộ thực tế của bạn — tệp của bạn, công cụ của bạn, thiết bị đầu cuối của bạn — mà không tải lên bất cứ thứ gì cho bên thứ ba. Bạn chạy nó trên máy của mình.
+Dev Space Go là một máy chủ MCP tự lưu trữ cho phép trợ lý AI đọc, chỉnh sửa, tìm kiếm và chạy mã trong các dự án cục bộ thực tế của bạn — tệp của bạn, công cụ của bạn, thiết bị đầu cuối của bạn — mà không tải lên bất cứ thứ gì cho bên thứ ba. Bạn chạy nó trên máy của mình.
 
 ---
 
@@ -131,7 +131,7 @@ Không cần biến môi trường — mọi thứ đều nằm trong tệp cấ
 
 ## Đường Hầm (Truy Cập Từ Xa)
 
-Đối với phiên bản web ChatGPT (yêu cầu HTTPS), DevSpace tự động khởi động một đường hầm:
+Đối với phiên bản web ChatGPT (yêu cầu HTTPS), Dev Space Go tự động khởi động một đường hầm:
 
 | Đường hầm | Loại URL | Thiết lập |
 |---|---|---|

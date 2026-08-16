@@ -1,8 +1,8 @@
-# DevSpace (Go Edition) - Eesti
+# Dev Space Go (Go Edition) - Eesti
 
 **Andke ChatGPT-le ja Claude'ile turvaline juurdepääs oma kohalikule masinale. Muutke iga MCP host oma kodeerimispartneriks.**
 
-DevSpace on isemajutatud MCP-server, mis võimaldab AI-assistentidel lugeda, redigeerida, otsida ja käivitada koodi teie päris kohalikes projektides — teie failid, teie tööriistad, teie terminal — ilma midagi kolmandale osapoolele üles laadimata. Käivitate selle oma masinas.
+Dev Space Go on isemajutatud MCP-server, mis võimaldab AI-assistentidel lugeda, redigeerida, otsida ja käivitada koodi teie päris kohalikes projektides — teie failid, teie tööriistad, teie terminal — ilma midagi kolmandale osapoolele üles laadimata. Käivitate selle oma masinas.
 
 ---
 
@@ -131,7 +131,7 @@ Keskkonnamuutujaid pole vaja — kõik on kaasaskantavas seadistusfailis.
 
 ## Tunnel (Kaugjuurdepääs)
 
-ChatGPT veebiversiooni jaoks (nõuab HTTPS) käivitab DevSpace automaatselt tunneli:
+ChatGPT veebiversiooni jaoks (nõuab HTTPS) käivitab Dev Space Go automaatselt tunneli:
 
 | Tunnel | URL-i tüüp | Seadistamine |
 |---|---|---|

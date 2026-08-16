@@ -1,8 +1,8 @@
-# DevSpace (Uhlelo lwe-Go)
+# Dev Space Go (Uhlelo lwe-Go)
 
 **Nikeza u-ChatGPT no-Claude ukufinyelela okuphephile emshinini wakho wendawo. Guqula noma iyiphi i-host ye-MCP ibe umlingani wakho wokubhala amakhodi.**
 
-I-DevSpace iyiseva ye-MCP ezisingathayo evumela abasizi be-AI ukuthi bafunde, bahlele, bacinge, futhi basebenzise ikhodi kumaphrojekthi akho angempela endawo — amafayela akho, amathuluzi akho, itheminali yakho — ngaphandle kokulayisha noma yini kumuntu wesithathu. Uyisebenzisa emshinini wakho, uyiveze ngomhubhe owulawulayo.
+I-Dev Space Go iyiseva ye-MCP ezisingathayo evumela abasizi be-AI ukuthi bafunde, bahlele, bacinge, futhi basebenzise ikhodi kumaphrojekthi akho angempela endawo — amafayela akho, amathuluzi akho, itheminali yakho — ngaphandle kokulayisha noma yini kumuntu wesithathu. Uyisebenzisa emshinini wakho, uyiveze ngomhubhe owulawulayo.
 
 ---
 
@@ -131,7 +131,7 @@ Akukho ziguquguquko zemvelo ezidingekayo — konke kusefayeleni lokumisa eliphat
 
 ## Umhubhe (Ukufinyelela Okukude)
 
-Kunguqulo yewebhu ye-ChatGPT (i-HTTPS iyadingeka), i-DevSpace iqala umhubhe ngokuzenzakalelayo:
+Kunguqulo yewebhu ye-ChatGPT (i-HTTPS iyadingeka), i-Dev Space Go iqala umhubhe ngokuzenzakalelayo:
 
 | Umhubhe | Uhlobo lwe-URL | Ukusetha |
 |---|---|---|

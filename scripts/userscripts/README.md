@@ -1,4 +1,4 @@
-# MCP WebCoder Auto-Approve — Tampermonkey Script
+# Dev Space Go Auto-Approve — Tampermonkey Script
 
 Automatycznie klika "Zawsze zezwalaj" / "Allow" / "Połącz" dla połączeń MCP w ChatGPT.
 Koniec z ręcznym potwierdzaniem za każdym razem!
@@ -26,4 +26,4 @@ Koniec z ręcznym potwierdzaniem za każdym razem!
 
 ## Wyłączenie
 
-Kliknij Tampermonkey → przełącznik przy "MCP WebCoder Auto-Approve for ChatGPT" → OFF.
+Kliknij Tampermonkey → przełącznik przy "Dev Space Go Auto-Approve for ChatGPT" → OFF.

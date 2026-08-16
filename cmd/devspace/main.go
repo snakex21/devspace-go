@@ -26,13 +26,13 @@ func main() {
 			if len(os.Args) > 2 && os.Args[2] == "get" {
 				runConfigShow()
 			} else {
-				fmt.Println("Usage: mcp-webcoder config get")
+				fmt.Println("Usage: devspace config get")
 			}
 		case "help", "--help", "-h":
 			printHelp()
 		default:
 			fmt.Printf("Unknown command: %s\n", os.Args[1])
-			fmt.Println("Run 'mcp-webcoder help' for usage.")
+			fmt.Println("Run 'devspace help' for usage.")
 		}
 		return
 	}
@@ -41,9 +41,9 @@ func main() {
 	cfg := config.LoadConfig()
 
 	if len(cfg.AllowedRoots) == 0 {
-		fmt.Fprintln(os.Stderr, "Error: MCP WebCoder nie jest skonfigurowany.")
-		fmt.Fprintln(os.Stderr, "Uruchom konfigurator: mcp-webcoder-gui.exe")
-		fmt.Fprintln(os.Stderr, "Lub tekstowo:         mcp-webcoder.exe init")
+		fmt.Fprintln(os.Stderr, "Error: Dev Space Go nie jest skonfigurowany.")
+		fmt.Fprintln(os.Stderr, "Uruchom konfigurator: devspace-gui.exe")
+		fmt.Fprintln(os.Stderr, "Lub tekstowo:         devspace.exe init")
 		os.Exit(1)
 	}
 	runServerWithConfig(cfg)
@@ -53,8 +53,8 @@ func runServer() {
 	cfg := config.LoadConfig()
 
 	if len(cfg.AllowedRoots) == 0 {
-		fmt.Fprintln(os.Stderr, "Error: WEBCODER_ALLOWED_ROOTS must be set.")
-		fmt.Fprintln(os.Stderr, "Run 'mcp-webcoder init' to configure.")
+		fmt.Fprintln(os.Stderr, "Error: DEVSPACE_ALLOWED_ROOTS must be set.")
+		fmt.Fprintln(os.Stderr, "Run 'devspace init' to configure.")
 		os.Exit(1)
 	}
 
@@ -81,7 +81,7 @@ func runServerWithConfig(cfg *config.Config) {
 }
 
 func runInit() {
-	fmt.Println("MCP WebCoder Init")
+	fmt.Println("Dev Space Go Init")
 	fmt.Println("=============")
 	fmt.Println()
 
@@ -125,11 +125,11 @@ func runInit() {
 	fmt.Println("Configuration saved!")
 	fmt.Printf("  Config: %s\n", cfg.ConfigDir)
 	fmt.Println()
-	fmt.Println("Run 'mcp-webcoder serve' to start the server.")
+	fmt.Println("Run 'devspace serve' to start the server.")
 }
 
 func runDoctor() {
-	fmt.Println("MCP WebCoder Doctor")
+	fmt.Println("Dev Space Go Doctor")
 	fmt.Println("=====================")
 	fmt.Println()
 
@@ -161,7 +161,7 @@ func runDoctor() {
 func runConfigShow() {
 	cfg := config.LoadConfig()
 
-	fmt.Println("MCP WebCoder Configuration")
+	fmt.Println("Dev Space Go Configuration")
 	fmt.Println("===========================")
 	fmt.Printf("Host:            %s\n", cfg.Host)
 	fmt.Printf("Port:            %d\n", cfg.Port)
@@ -181,10 +181,10 @@ func runConfigShow() {
 }
 
 func printHelp() {
-	fmt.Print(`MCP WebCoder — Web MCP Coding Workspace (Go)
+	fmt.Print(`Dev Space Go — Web MCP Coding Workspace (Go)
 
 Usage:
-  mcp-webcoder [command]
+  devspace [command]
 
 Commands:
   serve       Start the MCP server (default)
@@ -194,11 +194,11 @@ Commands:
   help        Show this help
 
 GUI Configurator:
-  mcp-webcoder-gui.exe    Desktop configuration window
+  devspace-gui.exe    Desktop configuration window
 
 Environment:
-  WEBCODER_ALLOWED_ROOTS       Required. Comma-separated allowed paths.
-  WEBCODER_PUBLIC_BASE_URL     Public base URL (default: http://127.0.0.1:7676)
+  DEVSPACE_ALLOWED_ROOTS       Required. Comma-separated allowed paths.
+  DEVSPACE_PUBLIC_BASE_URL     Public base URL (default: http://127.0.0.1:7676)
   HOST                         Listen host (default: 127.0.0.1)
   PORT                         Listen port (default: 7676)
 `)
@@ -223,7 +223,12 @@ func saveConfig(cfg *config.Config) error {
 	}
 
 	configPath := filepath.Join(cfg.ConfigDir, "config.json")
-	data, err := json.MarshalIndent(cfg, "", "  ")
+	portableCfg := *cfg
+	portableCfg.StateDir = config.PortablePath(cfg.StateDir)
+	portableCfg.WorktreeRoot = config.PortablePath(cfg.WorktreeRoot)
+	portableCfg.AgentDir = config.PortablePath(cfg.AgentDir)
+	portableCfg.ConfigDir = config.PortablePath(cfg.ConfigDir)
+	data, err := json.MarshalIndent(&portableCfg, "", "  ")
 	if err != nil {
 		return fmt.Errorf("marshal config: %w", err)
 	}

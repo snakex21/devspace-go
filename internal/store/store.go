@@ -3,6 +3,7 @@ package store
 import (
 	"database/sql"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sync"
@@ -36,7 +37,7 @@ func New(stateDir string) (*Store, error) {
 		return nil, fmt.Errorf("create state dir: %w", err)
 	}
 
-	dbPath := filepath.Join(stateDir, "webcoder.db")
+	dbPath := databasePath(stateDir)
 	db, err := sql.Open("sqlite", dbPath+"?_journal_mode=WAL&_foreign_keys=on")
 	if err != nil {
 		return nil, fmt.Errorf("open database: %w", err)
@@ -53,6 +54,69 @@ func New(stateDir string) (*Store, error) {
 	}
 
 	return s, nil
+}
+
+func databasePath(stateDir string) string {
+	dbPath := filepath.Join(stateDir, "devspace.db")
+	if _, err := os.Stat(dbPath); err == nil {
+		return dbPath
+	}
+
+	legacyPaths := []string{filepath.Join(stateDir, "webcoder.db")}
+	if filepath.Base(filepath.Clean(stateDir)) == ".devspace-state" {
+		legacyPaths = append(legacyPaths, filepath.Join(filepath.Dir(stateDir), ".webcoder-state", "webcoder.db"))
+	}
+
+	for _, legacyPath := range legacyPaths {
+		if _, err := os.Stat(legacyPath); err != nil {
+			continue
+		}
+		// A WAL may contain committed data not present in the main file. In that
+		// case keep using the legacy database instead of risking a partial copy.
+		if _, err := os.Stat(legacyPath + "-wal"); err == nil {
+			return legacyPath
+		}
+		if err := copyDatabase(legacyPath, dbPath); err == nil {
+			return dbPath
+		}
+		return legacyPath
+	}
+
+	return dbPath
+}
+
+func copyDatabase(sourcePath, destinationPath string) (err error) {
+	source, err := os.Open(sourcePath)
+	if err != nil {
+		return err
+	}
+	defer source.Close()
+
+	temporary, err := os.CreateTemp(filepath.Dir(destinationPath), ".devspace-db-migration-*")
+	if err != nil {
+		return err
+	}
+	temporaryPath := temporary.Name()
+	defer func() {
+		temporary.Close()
+		if err != nil {
+			_ = os.Remove(temporaryPath)
+		}
+	}()
+
+	if _, err = io.Copy(temporary, source); err != nil {
+		return err
+	}
+	if err = temporary.Sync(); err != nil {
+		return err
+	}
+	if err = temporary.Close(); err != nil {
+		return err
+	}
+	if err = os.Chmod(temporaryPath, 0600); err != nil {
+		return err
+	}
+	return os.Rename(temporaryPath, destinationPath)
 }
 
 // migrate creates the schema if it doesn't exist.

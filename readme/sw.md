@@ -1,8 +1,8 @@
-# DevSpace (Toleo la Go)
+# Dev Space Go (Toleo la Go)
 
 **Wape ChatGPT na Claude ufikiaji salama kwa mashine yako ya ndani. Geuza seva yoyote ya MCP kuwa mshirika wako wa usimbaji.**
 
-DevSpace ni seva ya MCP inayojiendesha yenyewe inayoruhusu wasaidizi wa AI kusoma, kuhariri, kutafuta, na kuendesha msimbo katika miradi yako halisi ya ndani — faili zako, zana zako, terminal yako — bila kupakia chochote kwa mhusika wa tatu. Unaiendesha kwenye mashine yako, unaitoa kupitia handaki unayodhibiti.
+Dev Space Go ni seva ya MCP inayojiendesha yenyewe inayoruhusu wasaidizi wa AI kusoma, kuhariri, kutafuta, na kuendesha msimbo katika miradi yako halisi ya ndani — faili zako, zana zako, terminal yako — bila kupakia chochote kwa mhusika wa tatu. Unaiendesha kwenye mashine yako, unaitoa kupitia handaki unayodhibiti.
 
 ---
 
@@ -131,7 +131,7 @@ Vigezo vya mazingira havihitajiki — kila kitu kipo kwenye faili ya usanidi ina
 
 ## Handaki (Ufikiaji wa Mbali)
 
-Kwa toleo la wavuti la ChatGPT (HTTPS inahitajika), DevSpace huanzisha handaki kiotomatiki:
+Kwa toleo la wavuti la ChatGPT (HTTPS inahitajika), Dev Space Go huanzisha handaki kiotomatiki:
 
 | Handaki | Aina ya URL | Usanidi |
 |---|---|---|

@@ -1,8 +1,8 @@
-# DevSpace (Go izdanje)
+# Dev Space Go (Go izdanje)
 
 **Dajte ChatGPT-u i Claudeu siguran pristup vašem lokalnom računalu. Pretvorite bilo koji MCP domaćin u svog partnera za programiranje.**
 
-DevSpace je samostalno hostirani MCP poslužitelj koji AI asistentima omogućuje čitanje, uređivanje, pretraživanje i pokretanje koda u vašim stvarnim lokalnim projektima — vaše datoteke, vaši alati, vaš terminal — bez slanja ičega trećoj strani. Pokrećete ga na svom računalu.
+Dev Space Go je samostalno hostirani MCP poslužitelj koji AI asistentima omogućuje čitanje, uređivanje, pretraživanje i pokretanje koda u vašim stvarnim lokalnim projektima — vaše datoteke, vaši alati, vaš terminal — bez slanja ičega trećoj strani. Pokrećete ga na svom računalu.
 
 ---
 
@@ -131,7 +131,7 @@ Nisu potrebne varijable okoline — sve je u prijenosnoj konfiguracijskoj datote
 
 ## Tunel (udaljeni pristup)
 
-Za web verziju ChatGPT-a (potreban HTTPS), DevSpace automatski pokreće tunel:
+Za web verziju ChatGPT-a (potreban HTTPS), Dev Space Go automatski pokreće tunel:
 
 | Tunel | Vrsta URL-a | Postavljanje |
 |---|---|---|

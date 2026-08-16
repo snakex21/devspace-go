@@ -1,8 +1,8 @@
-# DevSpace (Go Edition) - Català
+# Dev Space Go (Go Edition) - Català
 
 **Doneu a ChatGPT i Claude accés segur al vostre ordinador local. Convertiu qualsevol amfitrió MCP en el vostre company de codificació.**
 
-DevSpace és un servidor MCP autoallotjat que permet als assistents d'IA llegir, editar, buscar i executar codi als vostres projectes locals reals — els vostres fitxers, les vostres eines, el vostre terminal — sense penjar res a un tercer. L'executeu a la vostra màquina, l'exposeu a través d'un túnel que controleu i, opcionalment.
+Dev Space Go és un servidor MCP autoallotjat que permet als assistents d'IA llegir, editar, buscar i executar codi als vostres projectes locals reals — els vostres fitxers, les vostres eines, el vostre terminal — sense penjar res a un tercer. L'executeu a la vostra màquina, l'exposeu a través d'un túnel que controleu i, opcionalment.
 
 ---
 
@@ -131,7 +131,7 @@ No calen variables d'entorn — tot és al fitxer de configuració portàtil.
 
 ## Túnel (Accés Remot)
 
-Per a la versió web de ChatGPT (requereix HTTPS), DevSpace inicia automàticament un túnel:
+Per a la versió web de ChatGPT (requereix HTTPS), Dev Space Go inicia automàticament un túnel:
 
 | Túnel | Tipus d'URL | Configuració |
 |---|---|---|

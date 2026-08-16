@@ -1,8 +1,8 @@
-# DevSpace (Go izdevums)
+# Dev Space Go (Go izdevums)
 
 **Dodiet ChatGPT un Claude drošu piekļuvi savam lokālajam datoram. Pārvērtiet jebkuru MCP resursdatoru par savu programmēšanas partneri.**
 
-DevSpace ir pašmitināts MCP serveris, kas ļauj AI asistentiem lasīt, rediģēt, meklēt un palaist kodu jūsu reālajos lokālajos projektos — jūsu faili, jūsu rīki, jūsu terminālis — neko neaugšupielādējot trešajām pusēm. Jūs to palaižat savā datorā.
+Dev Space Go ir pašmitināts MCP serveris, kas ļauj AI asistentiem lasīt, rediģēt, meklēt un palaist kodu jūsu reālajos lokālajos projektos — jūsu faili, jūsu rīki, jūsu terminālis — neko neaugšupielādējot trešajām pusēm. Jūs to palaižat savā datorā.
 
 ---
 
@@ -131,7 +131,7 @@ Nav nepieciešami vides mainīgie — viss ir pārnēsājamā konfigurācijas fa
 
 ## Tunelis (attālā piekļuve)
 
-ChatGPT tīmekļa versijai (nepieciešams HTTPS), DevSpace automātiski palaiž tuneli:
+ChatGPT tīmekļa versijai (nepieciešams HTTPS), Dev Space Go automātiski palaiž tuneli:
 
 | Tunelis | URL veids | Iestatīšana |
 |---|---|---|

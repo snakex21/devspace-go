@@ -29,11 +29,12 @@ import (
 func boolPtr(b bool) *bool { return &b }
 
 const (
+	Version                = "2.1.0"
 	cloudflaredURLTimeout  = 30 * time.Second
 	cloudflaredMaxAttempts = 2
 )
 
-// Server represents the running MCP WebCoder server.
+// Server represents the running Dev Space Go server.
 type Server struct {
 	cfg        *config.Config
 	httpServer *http.Server
@@ -42,7 +43,7 @@ type Server struct {
 	store      *store.Store
 }
 
-// New creates a new MCP WebCoder server.
+// New creates a new Dev Space Go server.
 func New(cfg *config.Config) (*Server, error) {
 	logger.Init(string(cfg.Logging.Level), string(cfg.Logging.Format))
 	tools.SetShell(cfg.Shell)
@@ -68,7 +69,7 @@ func (s *Server) Start() error {
 	// Health check
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprintf(w, `{"ok":true,"name":"mcp-webcoder"}`)
+		fmt.Fprintf(w, `{"ok":true,"name":"devspace-go"}`)
 	})
 
 	// MCP endpoint using stateless Streamable HTTP. Workspace state is tracked
@@ -385,7 +386,7 @@ func printTunnelURL(url string) {
 // createMcpServer creates a new MCP server with all tools registered.
 func (s *Server) createMcpServer() *mcp.Server {
 	mcpServer := mcp.NewServer(
-		&mcp.Implementation{Name: "mcp-webcoder", Version: "0.1.0"},
+		&mcp.Implementation{Name: "devspace-go", Version: Version},
 		&mcp.ServerOptions{
 			Instructions: s.serverInstructions(),
 		},
@@ -395,7 +396,7 @@ func (s *Server) createMcpServer() *mcp.Server {
 	return mcpServer
 }
 
-// registerTools registers all MCP WebCoder tools on the MCP server.
+// registerTools registers all Dev Space Go tools on the MCP server.
 func (s *Server) registerTools(server *mcp.Server) {
 	names := s.toolNames()
 
@@ -452,7 +453,7 @@ func (s *Server) registerTools(server *mcp.Server) {
 	)
 
 	// open_default_workspace avoids passing local absolute paths through clients
-	// that may block filesystem-looking arguments before they reach MCP WebCoder.
+	// that may block filesystem-looking arguments before they reach Dev Space Go.
 	mcp.AddTool(server,
 		&mcp.Tool{
 			Name:        "open_default_workspace",
@@ -795,7 +796,7 @@ func (s *Server) serverInstructions() string {
 	agentsMd := "Follow instructions returned by open_workspace. Before working under a path listed in availableAgentsFiles, use read to inspect that instruction file and follow it. "
 
 	return fmt.Sprintf(
-		"Use MCP WebCoder as a local coding workspace. Call open_workspace once per project folder or worktree to obtain a workspaceId; if local absolute paths are blocked by the client, call open_default_workspace instead. Reuse that same workspaceId for all later file, search, edit, write, mkdir, move, and shell tools in that folder. If the workspaceId becomes stale after reconnecting, pass workspaceId 'default' or 'latest' to use the most recent/default workspace. %s%sPrefer %s for targeted modifications, %s only for new files or complete rewrites, %s for directory creation, %s for moves/renames, and %s for tests, builds, git inspection, package scripts, and commands that are better executed by the shell. Do not create, move, rename, or modify files with %s. On Windows, %s uses PowerShell.exe; on Unix, bash.",
+		"Use Dev Space Go as a local coding workspace. Call open_workspace once per project folder or worktree to obtain a workspaceId; if local absolute paths are blocked by the client, call open_default_workspace instead. Reuse that same workspaceId for all later file, search, edit, write, mkdir, move, and shell tools in that folder. If the workspaceId becomes stale after reconnecting, pass workspaceId 'default' or 'latest' to use the most recent/default workspace. %s%sPrefer %s for targeted modifications, %s only for new files or complete rewrites, %s for directory creation, %s for moves/renames, and %s for tests, builds, git inspection, package scripts, and commands that are better executed by the shell. Do not create, move, rename, or modify files with %s. On Windows, %s uses PowerShell.exe; on Unix, bash.",
 		agentsMd,
 		inspection,
 		names.Edit, names.Write, names.Mkdir, names.Move, names.Bash, names.Bash, names.Bash,

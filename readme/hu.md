@@ -1,8 +1,8 @@
-# DevSpace (Go kiadás)
+# Dev Space Go (Go kiadás)
 
 **Adjon biztonságos hozzáférést a ChatGPT-nek és a Claude-nak a helyi gépéhez. Alakítson bármilyen MCP hosztot a kódolási partnerévé.**
 
-A DevSpace egy önállóan üzemeltetett MCP szerver, amely lehetővé teszi az AI asszisztensek számára, hogy fájlokat olvassanak, szerkesszenek, keressenek és kódot futtassanak a valódi helyi projektjeiben — a fájljai, az eszközei, a terminálja — anélkül, hogy bármit feltöltene egy harmadik félhez. Ön futtatja a saját gépén, egy ön által vezérelt alagúton keresztül teszi elérhetővé.
+A Dev Space Go egy önállóan üzemeltetett MCP szerver, amely lehetővé teszi az AI asszisztensek számára, hogy fájlokat olvassanak, szerkesszenek, keressenek és kódot futtassanak a valódi helyi projektjeiben — a fájljai, az eszközei, a terminálja — anélkül, hogy bármit feltöltene egy harmadik félhez. Ön futtatja a saját gépén, egy ön által vezérelt alagúton keresztül teszi elérhetővé.
 
 ---
 
@@ -131,7 +131,7 @@ Nincs szükség környezeti változókra — minden a hordozható konfiguráció
 
 ## Alagút (távoli hozzáférés)
 
-A ChatGPT webes verziójához (HTTPS szükséges) a DevSpace automatikusan alagutat indít:
+A ChatGPT webes verziójához (HTTPS szükséges) a Dev Space Go automatikusan alagutat indít:
 
 | Alagút | URL típusa | Beállítás |
 |---|---|---|

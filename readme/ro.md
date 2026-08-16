@@ -1,8 +1,8 @@
-# DevSpace (Ediția Go)
+# Dev Space Go (Ediția Go)
 
 **Oferă ChatGPT și Claude acces securizat la mașina ta locală. Transformă orice host MCP în partenerul tău de programare.**
 
-DevSpace este un server MCP auto-găzduit care permite asistenților AI să citească, editeze, caute și ruleze cod în proiectele tale locale reale — fișierele tale, uneltele tale, terminalul tău — fără a încărca nimic către o terță parte. Îl rulezi pe mașina ta, îl expui printr-un tunel pe care îl controlezi și, opțional.
+Dev Space Go este un server MCP auto-găzduit care permite asistenților AI să citească, editeze, caute și ruleze cod în proiectele tale locale reale — fișierele tale, uneltele tale, terminalul tău — fără a încărca nimic către o terță parte. Îl rulezi pe mașina ta, îl expui printr-un tunel pe care îl controlezi și, opțional.
 
 ---
 
@@ -131,7 +131,7 @@ Nu sunt necesare variabile de mediu — totul este în fișierul de configurare 
 
 ## Tunel (Acces la Distanță)
 
-Pentru versiunea web ChatGPT (necesită HTTPS), DevSpace pornește automat un tunel:
+Pentru versiunea web ChatGPT (necesită HTTPS), Dev Space Go pornește automat un tunel:
 
 | Tunel | Tip URL | Configurare |
 |---|---|---|

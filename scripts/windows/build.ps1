@@ -1,4 +1,4 @@
-# Build DevSpace for all platforms
+# Build Dev Space Go for all platforms
 # Run from project root: .\scripts\windows\build.ps1
 
 $ErrorActionPreference = "Stop"
@@ -11,32 +11,43 @@ $targets = @(
     @{OS="darwin";  Arch="arm64";   Ext="";        Dir="macos-mchip"}
 )
 
-Write-Output "=== DevSpace Build All ==="
+Write-Output "=== Dev Space Go Build All ==="
 Write-Output ""
 
 # Clean build dir
 if (Test-Path build) { Remove-Item build -Recurse -Force }
 New-Item -ItemType Directory -Path build -Force | Out-Null
 
-foreach ($t in $targets) {
-    $platformDir = "build\$($t.Dir)"
-    New-Item -ItemType Directory -Path $platformDir -Force | Out-Null
+$originalGOOS = $env:GOOS
+$originalGOARCH = $env:GOARCH
+try {
+    foreach ($t in $targets) {
+        $platformDir = "build\$($t.Dir)"
+        New-Item -ItemType Directory -Path $platformDir -Force | Out-Null
 
-    $env:GOOS = $t.OS
-    $env:GOARCH = $t.Arch
+        $env:GOOS = $t.OS
+        $env:GOARCH = $t.Arch
 
-    # Main server (lightweight, no GUI)
-    Write-Output "  [$($t.Dir)] mcp-webcoder (serwer)..."
-    go build -o "$platformDir\mcp-webcoder$($t.Ext)" ./cmd/devspace/
+        # Main server (lightweight, no GUI)
+        Write-Output "  [$($t.Dir)] devspace (serwer)..."
+        go build -o "$platformDir\devspace$($t.Ext)" ./cmd/devspace/
 
-    # GUI configurator (Fyne — może nie działać cross-platform)
-    Write-Output "  [$($t.Dir)] mcp-webcoder-gui (konfigurator)..."
-    go build -o "$platformDir\mcp-webcoder-gui$($t.Ext)" ./cmd/devspace-gui/ 2>$null
-    if ($LASTEXITCODE -ne 0) {
-        Write-Output "         (GUI niedostępne na tej platformie przy cross-kompilacji)"
+        # Fyne GUI must be compiled natively. This Windows script builds only the
+        # Windows GUI and leaves Linux/macOS GUI builds to those platforms.
+        if ($t.OS -eq "windows") {
+            Write-Output "  [$($t.Dir)] devspace-gui (konfigurator)..."
+            go build -o "$platformDir\devspace-gui$($t.Ext)" ./cmd/devspace-gui/
+        }
+        else {
+            Write-Output "  [$($t.Dir)] devspace-gui: skipped (native build required)"
+        }
+
+        Write-Output ""
     }
-
-    Write-Output ""
+}
+finally {
+    $env:GOOS = $originalGOOS
+    $env:GOARCH = $originalGOARCH
 }
 
 # Portable tools copied next to release binaries.
@@ -66,7 +77,7 @@ foreach ($t in $targets) {
     Write-Output ""
 }
 
-Write-Output "Razem: serwer (4 platformy) + GUI (bieżąca platforma)"
+Write-Output "Summary: server (4 platforms) + GUI (current platform)"
 Write-Output ""
-Write-Output "UWAGA: GUI (Fyne) działa tylko na platformie na której kompilujesz."
-Write-Output "Na Linux/macOS skompiluj GUI natywnie na tych systemach."
+Write-Output "NOTE: Fyne GUI builds only on the current platform."
+Write-Output "Build the GUI natively on Linux and macOS."

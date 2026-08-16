@@ -1,5 +1,5 @@
 #!/bin/bash
-# Build DevSpace for all platforms
+# Build Dev Space Go for all platforms
 # Works on: Linux, macOS, WSL, Git Bash (Windows)
 # Run from project root: ./scripts/unix/build.sh
 
@@ -15,7 +15,7 @@ PLATFORMS=(
 
 DIRS=("windows" "linux" "macos-intel" "macos-mchip")
 
-echo "=== DevSpace Build All ==="
+echo "=== Dev Space Go Build All ==="
 echo ""
 
 rm -rf build

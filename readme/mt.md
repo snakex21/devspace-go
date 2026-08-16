@@ -1,8 +1,8 @@
-# DevSpace (Edizzjoni Go)
+# Dev Space Go (Edizzjoni Go)
 
 **Agħti lil ChatGPT u Claude aċċess sigur għall-magna lokali tiegħek. Ibbiddel kwalunkwe host MCP fis-sieħeb tal-kodifikazzjoni tiegħek.**
 
-DevSpace huwa server MCP li jospita lilek innifsek li jippermetti lill-assistenti tal-AI jaqraw, jeditjaw, ifittxu u jmexxu kodiċi fil-proġetti lokali reali tiegħek — il-fajls tiegħek, l-għodod tiegħek, it-terminal tiegħek — mingħajr ma ttella' xejn lil parti terza. Tħaddmu fuq il-magna tiegħek, tesponih permezz ta' mina li tikkontrolla.
+Dev Space Go huwa server MCP li jospita lilek innifsek li jippermetti lill-assistenti tal-AI jaqraw, jeditjaw, ifittxu u jmexxu kodiċi fil-proġetti lokali reali tiegħek — il-fajls tiegħek, l-għodod tiegħek, it-terminal tiegħek — mingħajr ma ttella' xejn lil parti terza. Tħaddmu fuq il-magna tiegħek, tesponih permezz ta' mina li tikkontrolla.
 
 ---
 
@@ -131,7 +131,7 @@ L-ebda varjabbli tal-ambjent meħtieġa — kollox jinsab fil-fajl tal-konfigura
 
 ## Mina (Aċċess Remot)
 
-Għall-verżjoni web ta' ChatGPT (HTTPS meħtieġ), DevSpace jibda awtomatikament mina:
+Għall-verżjoni web ta' ChatGPT (HTTPS meħtieġ), Dev Space Go jibda awtomatikament mina:
 
 | Mina | Tip ta' URL | Setup |
 |---|---|---|

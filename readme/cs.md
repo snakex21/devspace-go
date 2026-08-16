@@ -1,8 +1,8 @@
-# DevSpace (Go Edition) - Čeština
+# Dev Space Go (Go Edition) - Čeština
 
 **Dejte ChatGPT a Claude bezpečný přístup k vašemu lokálnímu počítači. Proměňte jakéhokoli MCP hostitele ve svého parťáka pro programování.**
 
-DevSpace je samo-hostovaný MCP server, který umožňuje AI asistentům číst, upravovat, vyhledávat a spouštět kód ve vašich skutečných lokálních projektech — vaše soubory, vaše nástroje, váš terminál — bez nahrávání čehokoli třetí straně. Spustíte ho na svém počítači, vystavíte ho přes tunel, který ovládáte.
+Dev Space Go je samo-hostovaný MCP server, který umožňuje AI asistentům číst, upravovat, vyhledávat a spouštět kód ve vašich skutečných lokálních projektech — vaše soubory, vaše nástroje, váš terminál — bez nahrávání čehokoli třetí straně. Spustíte ho na svém počítači, vystavíte ho přes tunel, který ovládáte.
 
 ---
 
@@ -131,7 +131,7 @@ Nejsou potřeba žádné proměnné prostředí — vše je v přenosném konfig
 
 ## Tunel (Vzdálený Přístup)
 
-Pro webovou verzi ChatGPT (vyžaduje HTTPS), DevSpace automaticky spouští tunel:
+Pro webovou verzi ChatGPT (vyžaduje HTTPS), Dev Space Go automaticky spouští tunel:
 
 | Tunel | Typ URL | Nastavení |
 |---|---|---|

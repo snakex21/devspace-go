@@ -64,7 +64,7 @@ type LoggingConfig struct {
 	TrustProxy    bool      `json:"trustProxy"`
 }
 
-// Config holds all MCP WebCoder server configuration.
+// Config holds all Dev Space Go server configuration.
 type Config struct {
 	Host          string        `json:"host"`
 	Port          int           `json:"port"`
@@ -95,10 +95,10 @@ func DefaultConfig() *Config {
 		Port:          7676,
 		AllowedRoots:  []string{},
 		PublicBaseURL: "http://127.0.0.1:7676",
-		StateDir:      filepath.Join(exeDir, ".webcoder-state"),
-		WorktreeRoot:  filepath.Join(exeDir, ".webcoder", "worktrees"),
+		StateDir:      filepath.Join(exeDir, ".devspace-state"),
+		WorktreeRoot:  filepath.Join(exeDir, ".devspace", "worktrees"),
 		AgentDir:      filepath.Join(exeDir, ".codex"),
-		ConfigDir:     filepath.Join(exeDir, ".webcoder"),
+		ConfigDir:     filepath.Join(exeDir, ".devspace"),
 		ToolMode:      ToolModeFull,
 		ToolNaming:    NamingShort,
 		Shell:         "auto",
@@ -121,6 +121,7 @@ func DefaultConfig() *Config {
 // LoadConfig loads configuration from environment variables and config files.
 func LoadConfig() *Config {
 	cfg := DefaultConfig()
+	loadedLegacyConfig := false
 
 	// Environment variable overrides
 	if v := os.Getenv("HOST"); v != "" {
@@ -129,79 +130,81 @@ func LoadConfig() *Config {
 	if v := os.Getenv("PORT"); v != "" {
 		fmt.Sscanf(v, "%d", &cfg.Port)
 	}
-	if v := os.Getenv("WEBCODER_ALLOWED_ROOTS"); v != "" {
+	if v := envValue("ALLOWED_ROOTS"); v != "" {
 		cfg.AllowedRoots = splitAndTrim(v, ",")
 	}
-	if v := os.Getenv("WEBCODER_PUBLIC_BASE_URL"); v != "" {
+	if v := envValue("PUBLIC_BASE_URL"); v != "" {
 		cfg.PublicBaseURL = v
 	}
-	if v := os.Getenv("WEBCODER_STATE_DIR"); v != "" {
+	if v := envValue("STATE_DIR"); v != "" {
 		cfg.StateDir = v
 	}
-	if v := os.Getenv("WEBCODER_WORKTREE_ROOT"); v != "" {
+	if v := envValue("WORKTREE_ROOT"); v != "" {
 		cfg.WorktreeRoot = v
 	}
-	if v := os.Getenv("WEBCODER_AGENT_DIR"); v != "" {
+	if v := envValue("AGENT_DIR"); v != "" {
 		cfg.AgentDir = v
 	}
-	if v := os.Getenv("WEBCODER_CONFIG_DIR"); v != "" {
+	if v := envValue("CONFIG_DIR"); v != "" {
 		cfg.ConfigDir = v
 	}
-	if v := os.Getenv("WEBCODER_TOOL_MODE"); v != "" {
+	if v := envValue("TOOL_MODE"); v != "" {
 		cfg.ToolMode = ToolMode(v)
 	}
-	if v := os.Getenv("WEBCODER_TOOL_NAMING"); v != "" {
+	if v := envValue("TOOL_NAMING"); v != "" {
 		cfg.ToolNaming = ToolNaming(v)
 	}
-	if v := os.Getenv("WEBCODER_SHELL"); v != "" {
+	if v := envValue("SHELL"); v != "" {
 		cfg.Shell = v
 	}
-	if v := os.Getenv("WEBCODER_LANG"); v != "" {
+	if v := envValue("LANG"); v != "" {
 		cfg.Lang = v
 	}
-	if v := os.Getenv("WEBCODER_WIDGETS"); v != "" {
+	if v := envValue("WIDGETS"); v != "" {
 		cfg.Widgets = WidgetMode(v)
 	}
-	if v := os.Getenv("WEBCODER_SKILLS"); v == "0" {
+	if v := envValue("SKILLS"); v == "0" {
 		cfg.SkillsEnabled = false
 	}
-	if v := os.Getenv("WEBCODER_SKILL_PATHS"); v != "" {
+	if v := envValue("SKILL_PATHS"); v != "" {
 		cfg.SkillPaths = splitAndTrim(v, ",")
 	}
-	if v := os.Getenv("WEBCODER_ALLOWED_HOSTS"); v != "" {
+	if v := envValue("ALLOWED_HOSTS"); v != "" {
 		cfg.AllowedHosts = splitAndTrim(v, ",")
 	}
 
 	// Logging config
-	if v := os.Getenv("WEBCODER_LOG_LEVEL"); v != "" {
+	if v := envValue("LOG_LEVEL"); v != "" {
 		cfg.Logging.Level = LogLevel(v)
 	}
-	if v := os.Getenv("WEBCODER_LOG_FORMAT"); v != "" {
+	if v := envValue("LOG_FORMAT"); v != "" {
 		cfg.Logging.Format = LogFormat(v)
 	}
-	if v := os.Getenv("WEBCODER_LOG_REQUESTS"); v == "0" {
+	if v := envValue("LOG_REQUESTS"); v == "0" {
 		cfg.Logging.Requests = false
 	}
-	if v := os.Getenv("WEBCODER_LOG_ASSETS"); v == "1" {
+	if v := envValue("LOG_ASSETS"); v == "1" {
 		cfg.Logging.Assets = true
 	}
-	if v := os.Getenv("WEBCODER_LOG_TOOL_CALLS"); v == "0" {
+	if v := envValue("LOG_TOOL_CALLS"); v == "0" {
 		cfg.Logging.ToolCalls = false
 	}
-	if v := os.Getenv("WEBCODER_LOG_SHELL_COMMANDS"); v == "1" {
+	if v := envValue("LOG_SHELL_COMMANDS"); v == "1" {
 		cfg.Logging.ShellCommands = true
 	}
-	if v := os.Getenv("WEBCODER_TRUST_PROXY"); v == "1" {
+	if v := envValue("TRUST_PROXY"); v == "1" {
 		cfg.Logging.TrustProxy = true
 	}
 
 	// Load from config file if exists (new path first, old path as migration fallback)
 	configFile := filepath.Join(cfg.ConfigDir, "config.json")
 	if _, err := os.Stat(configFile); os.IsNotExist(err) {
-		// Migration: try old .devspace/config.json
-		oldConfigFile := filepath.Join(filepath.Dir(cfg.ConfigDir), ".devspace", "config.json")
+		// Compatibility: use the legacy WebCoder config when no Dev Space Go
+		// config exists yet. Saving from the CLI or GUI writes to .devspace.
+		oldConfigFile := filepath.Join(filepath.Dir(cfg.ConfigDir), ".webcoder", "config.json")
 		if _, err := os.Stat(oldConfigFile); err == nil {
 			configFile = oldConfigFile
+			loadedLegacyConfig = true
 		}
 	}
 	if data, err := os.ReadFile(configFile); err == nil {
@@ -287,6 +290,11 @@ func LoadConfig() *Config {
 		}
 	}
 
+	if loadedLegacyConfig {
+		rebaseLegacyPortablePaths(cfg)
+	}
+	resolvePortablePaths(cfg)
+
 	// Resolve "auto" only after all sources have been merged. This avoids an
 	// unnecessary OS lookup when the config file already specifies a language.
 	if cfg.Lang == "auto" || cfg.Lang == "" {
@@ -300,15 +308,74 @@ func LoadConfig() *Config {
 	return cfg
 }
 
+// PortablePath converts a path inside the application directory to a relative
+// path suitable for config.json. External custom paths remain absolute.
+func PortablePath(path string) string {
+	if path == "" || !filepath.IsAbs(path) {
+		return path
+	}
+	rel, err := filepath.Rel(exeDir(), path)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return path
+	}
+	return rel
+}
+
+func resolvePortablePaths(cfg *Config) {
+	base := exeDir()
+	cfg.StateDir = resolvePortablePath(base, cfg.StateDir)
+	cfg.WorktreeRoot = resolvePortablePath(base, cfg.WorktreeRoot)
+	cfg.AgentDir = resolvePortablePath(base, cfg.AgentDir)
+	cfg.ConfigDir = resolvePortablePath(base, cfg.ConfigDir)
+}
+
+func resolvePortablePath(base, path string) string {
+	if path == "" || filepath.IsAbs(path) {
+		return path
+	}
+	return filepath.Join(base, path)
+}
+
+// Legacy configs stored generated portable paths as absolute paths. Rebase
+// those known defaults so moving the application folder also moves its data.
+func rebaseLegacyPortablePaths(cfg *Config) {
+	defaults := DefaultConfig()
+	if pathEndsWith(cfg.StateDir, ".webcoder-state") || pathEndsWith(cfg.StateDir, ".devspace-state") {
+		cfg.StateDir = defaults.StateDir
+	}
+	if pathEndsWith(cfg.WorktreeRoot, filepath.Join(".webcoder", "worktrees")) ||
+		pathEndsWith(cfg.WorktreeRoot, filepath.Join(".devspace", "worktrees")) {
+		cfg.WorktreeRoot = defaults.WorktreeRoot
+	}
+	if pathEndsWith(cfg.AgentDir, ".codex") {
+		cfg.AgentDir = defaults.AgentDir
+	}
+}
+
+func pathEndsWith(path, suffix string) bool {
+	path = strings.ToLower(filepath.Clean(path))
+	suffix = strings.ToLower(filepath.Clean(suffix))
+	return path == suffix || strings.HasSuffix(path, string(filepath.Separator)+suffix)
+}
+
 // ShellCommand returns the appropriate shell command for the current OS.
 func (c *Config) ShellCommand() string {
-	if v := os.Getenv("WEBCODER_SHELL"); v != "" {
+	if v := envValue("SHELL"); v != "" {
 		return v
 	}
 	if runtime.GOOS == "windows" {
 		return "powershell.exe"
 	}
 	return "bash"
+}
+
+// envValue returns a Dev Space Go environment variable, falling back to its
+// legacy WebCoder equivalent for backwards compatibility.
+func envValue(suffix string) string {
+	if value := os.Getenv("DEVSPACE_" + suffix); value != "" {
+		return value
+	}
+	return os.Getenv("WEBCODER_" + suffix)
 }
 
 // ShellArgs returns shell arguments for command execution.

@@ -1,8 +1,8 @@
-# DevSpace (Go Edition) - Deutsch
+# Dev Space Go (Go Edition) - Deutsch
 
 **Geben Sie ChatGPT & Claude sicheren Zugriff auf Ihren lokalen Rechner. Machen Sie jeden MCP-Host zu Ihrem Coding-Partner.**
 
-DevSpace ist ein selbst gehosteter MCP-Server, der KI-Assistenten erlaubt, Code in Ihren echten lokalen Projekten zu lesen, zu bearbeiten, zu durchsuchen und auszuführen — Ihre Dateien, Ihre Werkzeuge, Ihr Terminal — ohne etwas an Dritte hochzuladen. Sie führen ihn auf Ihrem Rechner aus.
+Dev Space Go ist ein selbst gehosteter MCP-Server, der KI-Assistenten erlaubt, Code in Ihren echten lokalen Projekten zu lesen, zu bearbeiten, zu durchsuchen und auszuführen — Ihre Dateien, Ihre Werkzeuge, Ihr Terminal — ohne etwas an Dritte hochzuladen. Sie führen ihn auf Ihrem Rechner aus.
 
 ---
 
@@ -131,7 +131,7 @@ Keine Umgebungsvariablen erforderlich — alles befindet sich in der portablen K
 
 ## Tunnel (Fernzugriff)
 
-Für die ChatGPT-Webversion (HTTPS erforderlich) startet DevSpace automatisch einen Tunnel:
+Für die ChatGPT-Webversion (HTTPS erforderlich) startet Dev Space Go automatisch einen Tunnel:
 
 | Tunnel | URL-Typ | Einrichtung |
 |---|---|---|

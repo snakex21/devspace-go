@@ -1,8 +1,8 @@
-# DevSpace (Go Edition) - Suomi
+# Dev Space Go (Go Edition) - Suomi
 
 **Anna ChatGPT:lle & Claudelle turvallinen pääsy paikalliselle koneellesi. Muuta mikä tahansa MCP-isäntä koodauskumppaniksesi.**
 
-DevSpace on itseisännöity MCP-palvelin, joka antaa tekoälyavustajien lukea, muokata, etsiä ja suorittaa koodia oikeissa paikallisissa projekteissasi — tiedostosi, työkalusi, päätteesi — lataamatta mitään kolmannelle osapuolelle. Suoritat sen koneellasi.
+Dev Space Go on itseisännöity MCP-palvelin, joka antaa tekoälyavustajien lukea, muokata, etsiä ja suorittaa koodia oikeissa paikallisissa projekteissasi — tiedostosi, työkalusi, päätteesi — lataamatta mitään kolmannelle osapuolelle. Suoritat sen koneellasi.
 
 ---
 
@@ -131,7 +131,7 @@ Ympäristömuuttujia ei tarvita — kaikki on kannettavassa määritystiedostoss
 
 ## Tunneli (Etäkäyttö)
 
-ChatGPT-verkkoversiolle (vaatii HTTPS) DevSpace käynnistää tunnelin automaattisesti:
+ChatGPT-verkkoversiolle (vaatii HTTPS) Dev Space Go käynnistää tunnelin automaattisesti:
 
 | Tunneli | URL-tyyppi | Asennus |
 |---|---|---|

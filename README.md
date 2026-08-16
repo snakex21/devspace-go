@@ -2,7 +2,7 @@
 
 **Give ChatGPT & Claude secure access to your local machine. Turn any MCP host into your coding partner.**
 
-MCP WebCoder is a self-hosted MCP server that lets AI assistants read, edit, search, and run code in your real local projects — your files, your tools, your terminal — without uploading anything to a third party. You run it on your machine and expose it through a tunnel you control.
+Dev Space Go is a self-hosted MCP server that lets AI assistants read, edit, search, and run code in your real local projects — your files, your tools, your terminal — without uploading anything to a third party. You run it on your machine and expose it through a tunnel you control.
 
 ---
 
@@ -47,13 +47,13 @@ Pick your platform from [Releases](../../releases) or build from source:
 
 ### 2. Configure (GUI or text)
 ```bash
-mcp-webcoder-gui              # Desktop configurator (GUI)
-mcp-webcoder init             # Text-based configurator
+devspace-gui                  # Desktop configurator (GUI)
+devspace init                 # Text-based configurator
 ```
 
 ### 3. Run
 ```bash
-mcp-webcoder                  # Starts server. Auto-detects config.
+devspace                      # Starts server. Auto-detects config.
 ```
 
 This also auto-starts a Cloudflare Tunnel if `cloudflared` is found in `tools/`.
@@ -72,10 +72,10 @@ No Node.js, no npm, no Python. Single binary.
 
 | Platform | Download |
 |---|---|
-| **Windows** | `mcp-webcoder.exe` + `mcp-webcoder-gui.exe` |
-| **Linux** | `mcp-webcoder` (GUI: compile natively) |
-| **macOS Intel** | `mcp-webcoder` (GUI: compile natively) |
-| **macOS M-chip** | `mcp-webcoder` (GUI: compile natively) |
+| **Windows** | `devspace.exe` + `devspace-gui.exe` |
+| **Linux** | `devspace` (GUI: compile natively) |
+| **macOS Intel** | `devspace` (GUI: compile natively) |
+| **macOS M-chip** | `devspace` (GUI: compile natively) |
 
 Requires **Go 1.23+** only if building from source.
 
@@ -90,7 +90,7 @@ Once connected, the AI can open one of your approved project folders as a worksp
 - **Search code** with regex and inspect directories
 - **Run shell commands** (PowerShell on Windows, bash on Unix)
 - **Discover project instructions** from `AGENTS.md` / `CLAUDE.md`
-- **Auto-configure** with portable `.webcoder/config.json`
+- **Auto-configure** with portable `.devspace/config.json`
 
 10 MCP tools: `open_workspace`, `read`, `write`, `mkdir`, `move`, `edit`, `grep`, `glob`, `ls`, `bash`
 
@@ -101,7 +101,7 @@ Once connected, the AI can open one of your approved project folders as a worksp
 All config lives **in the same folder as the executable** (portable):
 
 ```
-.webcoder/
+.devspace/
 └── config.json       ← allowed roots, port, shell, language
 ```
 
@@ -132,7 +132,7 @@ No environment variables needed — everything is in the portable config file.
 
 ## Tunnel (Remote Access)
 
-For ChatGPT web version (HTTPS required), MCP WebCoder auto-starts a tunnel:
+For ChatGPT web version (HTTPS required), Dev Space Go auto-starts a tunnel:
 
 | Tunnel | URL type | Setup |
 |---|---|---|
@@ -176,8 +176,8 @@ cd devspace-go
 make -f scripts/unix/Makefile    # Linux / Mac (make)
 
 # Build just for current platform
-go build -o mcp-webcoder ./cmd/devspace/
-go build -o mcp-webcoder-gui ./cmd/devspace-gui/
+go build -o devspace ./cmd/devspace/
+go build -o devspace-gui ./cmd/devspace-gui/
 ```
 
 ---
@@ -198,7 +198,7 @@ GUI requires Fyne (OpenGL) — cannot cross-compile. Server compiles everywhere.
 ## Project Structure
 
 ```
-mcp-webcoder/
+devspace-go/
 ├── cmd/
 │   ├── devspace/           ← CLI + MCP server
 │   └── devspace-gui/       ← Desktop GUI configurator (Fyne)
