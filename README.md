@@ -1,4 +1,4 @@
-# MCP WebCoder
+# Dev Space Go
 
 **Give ChatGPT & Claude secure access to your local machine. Turn any MCP host into your coding partner.**
 
