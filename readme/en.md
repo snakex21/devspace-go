@@ -140,6 +140,30 @@ For ChatGPT web version (HTTPS required), Dev Space Go auto-starts a tunnel:
 
 Server auto-detects which one is available. Restart the server for a new Cloudflare URL, or use Pinggy for a permanent URL.
 
+### Connection readiness and troubleshooting
+
+The local server starts listening before the tunnel is launched. A URL printed by
+`cloudflared` is only an allocated address: wait for Dev Space Go's **TUNNEL ACTIVE**
+banner, which appears after the public `/healthz` endpoint reaches this server.
+Startup checks retry transient DNS and gateway errors within a bounded timeout.
+Ctrl+C also cancels an in-progress tunnel startup and reaps the child process.
+
+Use **`/mcp`** with the default Cloudflare Quick Tunnel. Quick Tunnels
+[do not support SSE](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/),
+so switching to `/sse` will not fix them. The legacy `/sse` endpoint remains
+available locally or through a provider that supports SSE.
+
+If the public connection fails, check `http://127.0.0.1:7676/healthz` locally
+(adjust the configured host/port) and keep the tunnel log visible. The local
+server remains usable if tunnel startup fails. A tunnel process that exits is
+reported explicitly; its old URL is no longer active. Restarting a Quick Tunnel
+changes the public hostname, so update the MCP client's URL as well.
+
+The readiness check needs outbound HTTPS access to the generated hostname from
+the server machine. A local proxy, DNS filter, or firewall blocking that check
+can prevent the active banner even if another machine could reach the tunnel.
+Quick Tunnels are for development and have no uptime guarantee.
+
 ---
 
 ## Shell Support
