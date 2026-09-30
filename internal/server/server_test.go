@@ -53,13 +53,13 @@ func TestTunnelOutputUsesSelectedLocale(t *testing.T) {
 	}{
 		{
 			lang:       "en",
-			expected:   []string{"TUNNEL ACTIVE", "Paste this in ChatGPT", "try the /sse version"},
-			unexpected: []string{"TUNEL AKTYWNY", "Wklej w ChatGPT", "Jeśli ChatGPT"},
+			expected:   []string{"TUNNEL ACTIVE", "Paste this in ChatGPT", "/mcp"},
+			unexpected: []string{"TUNEL AKTYWNY", "Wklej w ChatGPT", "Jeśli ChatGPT", "/sse"},
 		},
 		{
 			lang:       "de",
-			expected:   []string{"TUNNEL AKTIV", "Füge dies in ChatGPT", "versuche die /sse-Version"},
-			unexpected: []string{"TUNEL AKTYWNY", "Paste this in ChatGPT"},
+			expected:   []string{"TUNNEL AKTIV", "Füge dies in ChatGPT", "/mcp"},
+			unexpected: []string{"TUNEL AKTYWNY", "Paste this in ChatGPT", "/sse"},
 		},
 	}
 
@@ -86,22 +86,22 @@ func TestStartTunnelRetriesCloudflaredBeforePinggy(t *testing.T) {
 
 	cloudflaredCalls := 0
 	pinggyCalls := 0
-	url := server.startTunnelWithProviders(
-		func() string {
+	tunnel := server.startTunnelWithProviders(context.Background(), "http://127.0.0.1:7676",
+		func(context.Context, string) (*tunnelProcess, error) {
 			cloudflaredCalls++
 			if cloudflaredCalls == cloudflaredMaxAttempts {
-				return "https://example.trycloudflare.com"
+				return &tunnelProcess{url: "https://example.trycloudflare.com"}, nil
 			}
-			return ""
+			return nil, nil
 		},
-		func() string {
+		func(context.Context, string) (*tunnelProcess, error) {
 			pinggyCalls++
-			return "https://example.pinggy.link"
+			return &tunnelProcess{url: "https://example.pinggy.link"}, nil
 		},
 	)
 
-	if url != "https://example.trycloudflare.com" {
-		t.Fatalf("startTunnelWithProviders returned %q", url)
+	if tunnel == nil || tunnel.url != "https://example.trycloudflare.com" {
+		t.Fatalf("startTunnelWithProviders returned %#v", tunnel)
 	}
 	if cloudflaredCalls != cloudflaredMaxAttempts {
 		t.Fatalf("cloudflared called %d times, want %d", cloudflaredCalls, cloudflaredMaxAttempts)
@@ -117,19 +117,19 @@ func TestStartTunnelFallsBackToPinggyAfterCloudflaredRetries(t *testing.T) {
 
 	cloudflaredCalls := 0
 	pinggyCalls := 0
-	url := server.startTunnelWithProviders(
-		func() string {
+	tunnel := server.startTunnelWithProviders(context.Background(), "http://127.0.0.1:7676",
+		func(context.Context, string) (*tunnelProcess, error) {
 			cloudflaredCalls++
-			return ""
+			return nil, nil
 		},
-		func() string {
+		func(context.Context, string) (*tunnelProcess, error) {
 			pinggyCalls++
-			return "https://example.pinggy.link"
+			return &tunnelProcess{url: "https://example.pinggy.link"}, nil
 		},
 	)
 
-	if url != "https://example.pinggy.link" {
-		t.Fatalf("startTunnelWithProviders returned %q", url)
+	if tunnel == nil || tunnel.url != "https://example.pinggy.link" {
+		t.Fatalf("startTunnelWithProviders returned %#v", tunnel)
 	}
 	if cloudflaredCalls != cloudflaredMaxAttempts {
 		t.Fatalf("cloudflared called %d times, want %d", cloudflaredCalls, cloudflaredMaxAttempts)

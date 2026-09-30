@@ -1,19 +1,17 @@
 package server
 
 import (
-	"bufio"
 	"context"
+	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
-	"os/exec"
 	"os/signal"
-	"path/filepath"
-	"regexp"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
-	"unicode/utf8"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/rs/zerolog/log"
@@ -28,19 +26,15 @@ import (
 // boolPtr returns a pointer to the given bool value (for ToolAnnotations pointer fields).
 func boolPtr(b bool) *bool { return &b }
 
-const (
-	Version                = "2.1.0"
-	cloudflaredURLTimeout  = 30 * time.Second
-	cloudflaredMaxAttempts = 2
-)
+const Version = "2.1.0"
 
 // Server represents the running Dev Space Go server.
 type Server struct {
-	cfg        *config.Config
-	httpServer *http.Server
-	tunnelStop context.CancelFunc
-	registry   *workspace.Registry
-	store      *store.Store
+	cfg      *config.Config
+	startMu  sync.Mutex
+	started  bool
+	registry *workspace.Registry
+	store    *store.Store
 }
 
 // New creates a new Dev Space Go server.
@@ -62,13 +56,42 @@ func New(cfg *config.Config) (*Server, error) {
 	}, nil
 }
 
-// Start begins listening for connections.
+// Start serves until Ctrl+C or SIGTERM. Signals are handled even during tunnel startup.
 func (s *Server) Start() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	return s.StartContext(ctx)
+}
+
+// StartContext serves until ctx is canceled. A Server owns its store and may be
+// started only once; create a new Server for another run.
+func (s *Server) StartContext(ctx context.Context) error {
+	return s.start(ctx, s.startTunnel)
+}
+
+func (s *Server) start(ctx context.Context, startTunnel func(context.Context, string) *tunnelProcess) error {
+	s.startMu.Lock()
+	if s.started {
+		s.startMu.Unlock()
+		return errors.New("server has already been started")
+	}
+	s.started = true
+	s.startMu.Unlock()
+	if s.store != nil {
+		defer s.store.Close()
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	mux := http.NewServeMux()
 
 	// Health check
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Cache-Control", "no-store")
 		fmt.Fprintf(w, `{"ok":true,"name":"devspace-go"}`)
 	})
 
@@ -88,58 +111,77 @@ func (s *Server) Start() error {
 	)
 	mux.Handle("/sse", sseHandler)
 
-	s.httpServer = &http.Server{
-		Addr:    fmt.Sprintf("%s:%d", s.cfg.Host, s.cfg.Port),
-		Handler: s.loggingMiddleware(mux),
+	// Bind before launching a tunnel. An occupied port must not expose another
+	// process, and the origin must already serve requests during tunnel startup.
+	listener, err := net.Listen("tcp", net.JoinHostPort(s.cfg.Host, fmt.Sprint(s.cfg.Port)))
+	if err != nil {
+		return fmt.Errorf("listen: %w", err)
 	}
+	defer listener.Close()
+	httpServer := &http.Server{Handler: s.loggingMiddleware(mux)}
+	serveDone := make(chan error, 1)
+	go func() { serveDone <- httpServer.Serve(listener) }()
 
-	// Auto-start Cloudflare Tunnel if available
-	s.startTunnel() // non-fatal
-
-	// Graceful shutdown
-	idleConnsClosed := make(chan struct{})
+	tunnelDone := make(chan struct{})
 	go func() {
-		sigint := make(chan os.Signal, 1)
-		signal.Notify(sigint, os.Interrupt, syscall.SIGTERM)
-		<-sigint
-
-		log.Info().Msg(locales.T("server.shutdown"))
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-
-		if err := s.httpServer.Shutdown(ctx); err != nil {
-			log.Error().Err(err).Msg("server shutdown error")
+		defer close(tunnelDone)
+		tunnel := startTunnel(ctx, tunnelOrigin(listener.Addr().String()))
+		if tunnel == nil {
+			return
 		}
-		if s.tunnelStop != nil {
-			s.tunnelStop()
+		defer tunnel.stop()
+		select {
+		case <-ctx.Done():
+		case <-tunnel.done:
+			if ctx.Err() == nil {
+				log.Error().Err(tunnel.err).Msg("tunnel exited; public URL is no longer active; server remains available locally")
+			}
 		}
-		if s.store != nil {
-			s.store.Close()
-		}
-		close(idleConnsClosed)
 	}()
 
-	log.Info().
-		Str("host", s.cfg.Host).
-		Int("port", s.cfg.Port).
-		Msg(locales.T("server.listening"))
-
-	log.Info().
-		Strs("allowed_roots", s.cfg.AllowedRoots).
-		Msg(locales.T("server.roots"))
-
-	log.Info().
-		Bool("skills", s.cfg.SkillsEnabled).
-		Str("tool_mode", string(s.cfg.ToolMode)).
-		Str("tool_naming", string(s.cfg.ToolNaming)).
+	log.Info().Str("address", listener.Addr().String()).Msg(locales.T("server.listening"))
+	log.Info().Strs("allowed_roots", s.cfg.AllowedRoots).Msg(locales.T("server.roots"))
+	log.Info().Bool("skills", s.cfg.SkillsEnabled).
+		Str("tool_mode", string(s.cfg.ToolMode)).Str("tool_naming", string(s.cfg.ToolNaming)).
 		Msg(locales.T("server.config"))
 
-	if err := s.httpServer.ListenAndServe(); err != http.ErrServerClosed {
+	select {
+	case err = <-serveDone:
+		if errors.Is(err, http.ErrServerClosed) {
+			err = nil
+		}
+	case <-ctx.Done():
+		log.Info().Msg(locales.T("server.shutdown"))
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		if shutdownErr := httpServer.Shutdown(shutdownCtx); shutdownErr != nil {
+			// Shutdown does not forcibly close long-lived SSE or other active requests.
+			_ = httpServer.Close()
+		}
+		shutdownCancel()
+		<-serveDone
+	}
+	cancel()
+	_ = httpServer.Close()
+	<-tunnelDone
+	if err != nil {
 		return fmt.Errorf("server error: %w", err)
 	}
-
-	<-idleConnsClosed
 	return nil
+}
+
+// Wildcard listen addresses are not valid upstream targets on all platforms.
+func tunnelOrigin(address string) string {
+	host, port, err := net.SplitHostPort(address)
+	if err != nil {
+		return "http://" + address
+	}
+	if host == "" || host == "0.0.0.0" {
+		host = "127.0.0.1"
+	}
+	if host == "::" {
+		host = "::1"
+	}
+	return "http://" + net.JoinHostPort(host, port)
 }
 
 func (s *Server) streamableMCPHandler() http.Handler {
@@ -153,234 +195,6 @@ func (s *Server) streamableMCPHandler() http.Handler {
 			DisableLocalhostProtection: true,
 		},
 	)
-}
-
-// startTunnel attempts to start a tunnel to expose the server publicly.
-// Tries cloudflared first, falls back to pinggy.
-// Returns the public URL if successful. Non-fatal.
-func (s *Server) startTunnel() string {
-	return s.startTunnelWithProviders(s.startCloudflared, s.startPinggy)
-}
-
-func (s *Server) startTunnelWithProviders(startCloudflared, startPinggy func() string) string {
-	for attempt := 0; attempt < cloudflaredMaxAttempts; attempt++ {
-		if url := startCloudflared(); url != "" {
-			return url
-		}
-	}
-
-	if url := startPinggy(); url != "" {
-		return url
-	}
-
-	fmt.Printf("⚠️  %s\n", locales.T("tunnel.cloudflared_timeout"))
-	return ""
-}
-
-// startPinggy creates a tunnel via pinggy.io using SSH.
-// Uses the same SSH key each time → same URL across restarts.
-func (s *Server) startPinggy() string {
-	sshPath, err := exec.LookPath("ssh")
-	if err != nil {
-		return "" // ssh not available
-	}
-
-	fmt.Println()
-	fmt.Printf("🔗  %s\n", locales.T("tunnel.starting_pinggy"))
-	fmt.Println()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	target := fmt.Sprintf("R0:localhost:%d", s.cfg.Port)
-	cmd := exec.CommandContext(ctx, sshPath,
-		"-p", "443",
-		"-o", "StrictHostKeyChecking=accept-new",
-		"-o", "ServerAliveInterval=30",
-		"-R", target,
-		"a.pinggy.io",
-	)
-
-	stdout, _ := cmd.StdoutPipe()
-	stderrPipe, _ := cmd.StderrPipe()
-
-	if err := cmd.Start(); err != nil {
-		fmt.Printf("⚠️  %s (pinggy): %v\n", locales.T("error.cmd_failed"), err)
-		cancel()
-		return ""
-	}
-
-	// Pinggy prints URL to stdout
-	urlRegex := regexp.MustCompile(`https://[a-zA-Z0-9]+\.(a\.)?pinggy\.(link|io|xyz)`)
-	done := make(chan string, 1)
-
-	go func() {
-		scanner := bufio.NewScanner(stdout)
-		for scanner.Scan() {
-			line := scanner.Text()
-			fmt.Println(line)
-			if match := urlRegex.FindString(line); match != "" {
-				done <- match
-				return
-			}
-		}
-	}()
-
-	// Also check stderr
-	go func() {
-		scanner := bufio.NewScanner(stderrPipe)
-		for scanner.Scan() {
-			line := scanner.Text()
-			if match := urlRegex.FindString(line); match != "" {
-				select {
-				case done <- match:
-				default:
-				}
-				return
-			}
-		}
-	}()
-
-	select {
-	case url := <-done:
-		s.tunnelStop = cancel
-		printTunnelURL(url)
-		return url
-	case <-time.After(15 * time.Second):
-		cancel()
-		return ""
-	}
-}
-
-// startCloudflared creates a tunnel via cloudflared.
-func (s *Server) startCloudflared() string {
-	tunnelExe := findCloudflaredExecutable()
-	if tunnelExe == "" {
-		return ""
-	}
-
-	fmt.Println()
-	fmt.Printf("🔗  %s\n", locales.T("tunnel.starting_cloudflared"))
-	fmt.Printf("    %s\n", tunnelExe)
-	fmt.Println()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	cmd := exec.CommandContext(ctx, tunnelExe, "tunnel", "--url", fmt.Sprintf("http://%s:%d", s.cfg.Host, s.cfg.Port))
-
-	stdout, _ := cmd.StdoutPipe()
-	stderrPipe, _ := cmd.StderrPipe()
-
-	if err := cmd.Start(); err != nil {
-		fmt.Printf("⚠️  %s (cloudflared): %v\n", locales.T("error.cmd_failed"), err)
-		cancel()
-		return ""
-	}
-
-	urlRegex := regexp.MustCompile(`https://[a-zA-Z0-9-]+\.trycloudflare\.com`)
-	done := make(chan string, 1)
-
-	go func() {
-		scanner := bufio.NewScanner(stdout)
-		for scanner.Scan() {
-			if match := urlRegex.FindString(scanner.Text()); match != "" {
-				done <- match
-				return
-			}
-		}
-	}()
-
-	go func() {
-		scanner := bufio.NewScanner(stderrPipe)
-		for scanner.Scan() {
-			line := scanner.Text()
-			fmt.Println(line)
-			if match := urlRegex.FindString(line); match != "" {
-				select {
-				case done <- match:
-				default:
-				}
-				return
-			}
-		}
-	}()
-
-	select {
-	case url := <-done:
-		s.tunnelStop = cancel
-		printTunnelURL(url)
-		return url
-	case <-time.After(cloudflaredURLTimeout):
-		cancel()
-		return ""
-	}
-}
-
-func findCloudflaredExecutable() string {
-	names := []string{"cloudflared.exe", "cloudflared"}
-	var dirs []string
-
-	if exePath, err := os.Executable(); err == nil {
-		exeDir := filepath.Dir(exePath)
-		for dir := exeDir; dir != ""; dir = filepath.Dir(dir) {
-			dirs = append(dirs, filepath.Join(dir, "tools"), dir)
-			parent := filepath.Dir(dir)
-			if parent == dir {
-				break
-			}
-		}
-	}
-	if wd, err := os.Getwd(); err == nil {
-		dirs = append(dirs, filepath.Join(wd, "tools"), wd)
-	}
-
-	seen := map[string]bool{}
-	for _, dir := range dirs {
-		cleanDir := filepath.Clean(dir)
-		if seen[cleanDir] {
-			continue
-		}
-		seen[cleanDir] = true
-		for _, name := range names {
-			candidate := filepath.Join(cleanDir, name)
-			if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
-				return candidate
-			}
-		}
-	}
-
-	for _, name := range names {
-		if path, err := exec.LookPath(name); err == nil {
-			return path
-		}
-	}
-	return ""
-}
-
-func printTunnelURL(url string) {
-	mcpURL := url + "/mcp"
-	sseURL := url + "/sse"
-	lines := []string{
-		"🌐 " + locales.T("tunnel.active"),
-		mcpURL,
-		sseURL,
-		"",
-		locales.T("tunnel.paste_chatgpt"),
-		mcpURL,
-		locales.T("tunnel.try_sse"),
-	}
-	width := 54
-	for _, line := range lines {
-		if lineWidth := utf8.RuneCountInString(line); lineWidth > width {
-			width = lineWidth
-		}
-	}
-
-	fmt.Println()
-	fmt.Printf("╔%s╗\n", strings.Repeat("═", width+4))
-	for _, line := range lines {
-		padding := strings.Repeat(" ", width-utf8.RuneCountInString(line))
-		fmt.Printf("║  %s%s  ║\n", line, padding)
-	}
-	fmt.Printf("╚%s╝\n", strings.Repeat("═", width+4))
-	fmt.Println()
 }
 
 // createMcpServer creates a new MCP server with all tools registered.

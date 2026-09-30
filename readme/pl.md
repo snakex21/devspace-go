@@ -140,6 +140,30 @@ Dla wersji webowej ChatGPT (wymagane HTTPS), Dev Space Go automatycznie uruchami
 
 Serwer automatycznie wykrywa, który jest dostępny. Uruchom ponownie serwer, aby uzyskać nowy URL Cloudflare, lub użyj Pinggy dla stałego URL.
 
+### Gotowość połączenia i diagnostyka
+
+Serwer lokalny zaczyna nasłuchiwać przed uruchomieniem tunelu. Sam adres wypisany
+przez `cloudflared` nie oznacza gotowego połączenia: poczekaj na ramkę
+**TUNEL AKTYWNY** w Dev Space Go. Pojawi się dopiero po sprawdzeniu publicznego
+`/healthz`. Przejściowe błędy DNS i bramy są ponawiane w ograniczonym czasie.
+Ctrl+C przerywa również uruchamianie tunelu i kończy jego proces potomny.
+
+Z domyślnym Cloudflare Quick Tunnel używaj **`/mcp`**. Quick Tunnels
+[nie obsługują SSE](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/),
+więc przełączenie na `/sse` nie naprawi tego połączenia. Starszy endpoint `/sse`
+pozostaje dostępny lokalnie lub przez usługę obsługującą SSE.
+
+Przy problemach sprawdź lokalnie `http://127.0.0.1:7676/healthz` (uwzględnij swój
+host i port) oraz komunikaty procesu tunelu. Serwer lokalny działa także wtedy,
+gdy uruchomienie tunelu się nie powiedzie. Zakończenie procesu tunelu jest
+zgłaszane jawnie; jego poprzedni adres przestaje działać. Restart Quick Tunnel
+zmienia hostname, dlatego trzeba zaktualizować URL w kliencie MCP.
+
+Kontrola gotowości wymaga wychodzącego HTTPS do wygenerowanej domeny z komputera
+serwera. Lokalny proxy, filtr DNS lub zapora blokująca tę kontrolę może uniemożliwić
+potwierdzenie gotowości, nawet jeśli tunel jest osiągalny z innego komputera.
+Quick Tunnels służą do testów i nie mają gwarancji dostępności.
+
 ---
 
 ## Obsługa powłoki
