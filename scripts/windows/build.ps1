@@ -18,6 +18,10 @@ Write-Output ""
 if (Test-Path build) { Remove-Item build -Recurse -Force }
 New-Item -ItemType Directory -Path build -Force | Out-Null
 
+# Release flags: strip symbol/DWARF tables (-s -w) and local build paths
+# (-trimpath). Smaller binaries; panics still print stack traces.
+$buildFlags = @("-trimpath", "-ldflags=-s -w")
+
 $originalGOOS = $env:GOOS
 $originalGOARCH = $env:GOARCH
 try {
@@ -30,13 +34,13 @@ try {
 
         # Main server (lightweight, no GUI)
         Write-Output "  [$($t.Dir)] devspace (serwer)..."
-        go build -o "$platformDir\devspace$($t.Ext)" ./cmd/devspace/
+        go build @buildFlags -o "$platformDir\devspace$($t.Ext)" ./cmd/devspace/
 
         # Fyne GUI must be compiled natively. This Windows script builds only the
         # Windows GUI and leaves Linux/macOS GUI builds to those platforms.
         if ($t.OS -eq "windows") {
             Write-Output "  [$($t.Dir)] devspace-gui (konfigurator)..."
-            go build -o "$platformDir\devspace-gui$($t.Ext)" ./cmd/devspace-gui/
+            go build @buildFlags -o "$platformDir\devspace-gui$($t.Ext)" ./cmd/devspace-gui/
         }
         else {
             Write-Output "  [$($t.Dir)] devspace-gui: skipped (native build required)"

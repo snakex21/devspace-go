@@ -15,6 +15,10 @@ PLATFORMS=(
 
 DIRS=("windows" "linux" "macos-intel" "macos-mchip")
 
+# Release flags: strip symbol/DWARF tables (-s -w) and local build paths
+# (-trimpath). Smaller binaries; panics still print stack traces.
+BUILD_FLAGS=(-trimpath -ldflags="-s -w")
+
 echo "=== Dev Space Go Build All ==="
 echo ""
 
@@ -27,11 +31,11 @@ for i in "${!PLATFORMS[@]}"; do
     mkdir -p "build/$dir"
 
     echo "  [$dir] devspace (serwer)..."
-    GOOS=$os GOARCH=$arch go build -o "build/$dir/devspace$ext" ./cmd/devspace/
+    GOOS=$os GOARCH=$arch go build "${BUILD_FLAGS[@]}" -o "build/$dir/devspace$ext" ./cmd/devspace/
     echo "        -> build/$dir/devspace$ext"
 
     echo "  [$dir] devspace-gui (konfigurator)..."
-    GOOS=$os GOARCH=$arch go build -o "build/$dir/devspace-gui$ext" ./cmd/devspace-gui/ 2>/dev/null || \
+    GOOS=$os GOARCH=$arch go build "${BUILD_FLAGS[@]}" -o "build/$dir/devspace-gui$ext" ./cmd/devspace-gui/ 2>/dev/null || \
         echo "        (GUI niedostępne przy cross-kompilacji — skompiluj natywnie)"
 
     echo ""
