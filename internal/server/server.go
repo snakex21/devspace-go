@@ -59,9 +59,15 @@ func New(cfg *config.Config) (*Server, error) {
 }
 
 // Start serves until Ctrl+C or SIGTERM. Signals are handled even during tunnel startup.
+// After the first signal the default handlers are restored, so a second
+// Ctrl+C terminates the process even if shutdown is stuck.
 func (s *Server) Start() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	go func() {
+		<-ctx.Done()
+		stop()
+	}()
 	return s.StartContext(ctx)
 }
 
@@ -85,6 +91,9 @@ func (s *Server) start(ctx context.Context, startTunnel tunnelStarter) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
+	if s.cfg.Port < 0 || s.cfg.Port > 65535 {
+		return fmt.Errorf("invalid port %d in configuration: use 1-65535", s.cfg.Port)
+	}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -102,7 +111,7 @@ func (s *Server) start(ctx context.Context, startTunnel tunnelStarter) error {
 	// mode when a proxy or web client drops an Mcp-Session-Id between requests.
 	handler := s.streamableMCPHandler()
 
-	mux.Handle("/mcp", handler)
+	mux.Handle("/mcp", limitRequestBody(handler))
 
 	// Legacy SSE endpoint for MCP clients that still expect /sse.
 	sseHandler := mcp.NewSSEHandler(
@@ -111,16 +120,22 @@ func (s *Server) start(ctx context.Context, startTunnel tunnelStarter) error {
 		},
 		&mcp.SSEOptions{DisableLocalhostProtection: true},
 	)
-	mux.Handle("/sse", sseHandler)
+	mux.Handle("/sse", limitRequestBody(sseHandler))
 
 	// Bind before launching a tunnel. An occupied port must not expose another
 	// process, and the origin must already serve requests during tunnel startup.
-	listener, err := net.Listen("tcp", net.JoinHostPort(s.cfg.Host, fmt.Sprint(s.cfg.Port)))
+	address := net.JoinHostPort(s.cfg.Host, fmt.Sprint(s.cfg.Port))
+	listener, err := net.Listen("tcp", address)
 	if err != nil {
-		return fmt.Errorf("listen: %w", err)
+		return describeListenError(address, err)
 	}
 	defer listener.Close()
-	httpServer := &http.Server{Handler: s.loggingMiddleware(mux)}
+	// Requests derive from requestCtx. Canceling it at shutdown ends SSE streams
+	// and running shell commands (killing their process trees) right away,
+	// instead of letting Shutdown wait for them until its timeout.
+	requestCtx, cancelRequests := context.WithCancel(context.Background())
+	defer cancelRequests()
+	httpServer := newHTTPServer(recoverMiddleware(s.loggingMiddleware(mux)), requestCtx)
 	serveDone := make(chan error, 1)
 	go func() { serveDone <- httpServer.Serve(listener) }()
 
@@ -147,7 +162,8 @@ func (s *Server) start(ctx context.Context, startTunnel tunnelStarter) error {
 		}
 	case <-ctx.Done():
 		log.Info().Msg(locales.T("server.shutdown"))
-		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		cancelRequests()
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), shutdownTimeout)
 		if shutdownErr := httpServer.Shutdown(shutdownCtx); shutdownErr != nil {
 			// Shutdown does not forcibly close long-lived SSE or other active requests.
 			_ = httpServer.Close()
@@ -210,7 +226,7 @@ func (s *Server) registerTools(server *mcp.Server) {
 	names := s.toolNames()
 
 	// open_workspace
-	mcp.AddTool(server,
+	addTool(server,
 		&mcp.Tool{
 			Name:        "open_workspace",
 			Description: "Open a local project directory as a coding workspace. If path is empty or 'default', opens the first configured allowed root. Call this once per project folder or worktree before reading, editing, searching, writing, or running commands. Reuse the returned workspaceId for later calls in the same folder. If a remote client blocks local absolute paths, call open_default_workspace instead.",
@@ -263,7 +279,7 @@ func (s *Server) registerTools(server *mcp.Server) {
 
 	// open_default_workspace avoids passing local absolute paths through clients
 	// that may block filesystem-looking arguments before they reach Dev Space Go.
-	mcp.AddTool(server,
+	addTool(server,
 		&mcp.Tool{
 			Name:        "open_default_workspace",
 			Description: "Open the default configured workspace without sending a local path. Use this when open_workspace with an absolute Windows/macOS/Linux path is blocked by the MCP client. Returns a workspaceId for the first allowed root.",
@@ -309,7 +325,7 @@ func (s *Server) registerTools(server *mcp.Server) {
 	)
 
 	// read
-	mcp.AddTool(server,
+	addTool(server,
 		&mcp.Tool{
 			Name:        names.Read,
 			Description: "Read a file inside an open workspace. Use this for file inspection instead of shell commands like cat. Call open_workspace first and pass workspaceId.",
@@ -323,19 +339,12 @@ func (s *Server) registerTools(server *mcp.Server) {
 				return result, tools.ReadOutput{}, nil
 			}
 
-			_, err = s.registry.ResolvePath(ws, input.Path)
-			if err != nil {
-				result := &mcp.CallToolResult{}
-				result.SetError(err)
-				return result, tools.ReadOutput{}, nil
-			}
-
 			return tools.ReadFile(ctx, req, input, ws.Root)
 		},
 	)
 
 	// write
-	mcp.AddTool(server,
+	addTool(server,
 		&mcp.Tool{
 			Name:        names.Write,
 			Description: fmt.Sprintf("Create or completely overwrite a file inside an open workspace. Prefer %s for targeted changes to existing files. Call open_workspace first and pass workspaceId.", names.Edit),
@@ -354,19 +363,12 @@ func (s *Server) registerTools(server *mcp.Server) {
 				return result, tools.WriteOutput{}, nil
 			}
 
-			_, err = s.registry.ResolvePath(ws, input.Path)
-			if err != nil {
-				result := &mcp.CallToolResult{}
-				result.SetError(err)
-				return result, tools.WriteOutput{}, nil
-			}
-
 			return tools.WriteFile(ctx, req, input, ws.Root)
 		},
 	)
 
 	// mkdir
-	mcp.AddTool(server,
+	addTool(server,
 		&mcp.Tool{
 			Name:        names.Mkdir,
 			Description: "Create a directory inside an open workspace, including missing parent directories. Use this instead of shell mkdir/New-Item. Call open_workspace first and pass workspaceId.",
@@ -385,19 +387,12 @@ func (s *Server) registerTools(server *mcp.Server) {
 				return result, tools.MkdirOutput{}, nil
 			}
 
-			_, err = s.registry.ResolvePath(ws, input.Path)
-			if err != nil {
-				result := &mcp.CallToolResult{}
-				result.SetError(err)
-				return result, tools.MkdirOutput{}, nil
-			}
-
 			return tools.MakeDirectory(ctx, req, input, ws.Root)
 		},
 	)
 
 	// move
-	mcp.AddTool(server,
+	addTool(server,
 		&mcp.Tool{
 			Name:        names.Move,
 			Description: "Move or rename a file/directory inside an open workspace. Creates missing parent directories for the destination. Use this instead of shell Move-Item/mv. Call open_workspace first and pass workspaceId.",
@@ -416,25 +411,12 @@ func (s *Server) registerTools(server *mcp.Server) {
 				return result, tools.MoveOutput{}, nil
 			}
 
-			_, err = s.registry.ResolvePath(ws, input.SourcePath)
-			if err != nil {
-				result := &mcp.CallToolResult{}
-				result.SetError(err)
-				return result, tools.MoveOutput{}, nil
-			}
-			_, err = s.registry.ResolvePath(ws, input.TargetPath)
-			if err != nil {
-				result := &mcp.CallToolResult{}
-				result.SetError(err)
-				return result, tools.MoveOutput{}, nil
-			}
-
 			return tools.MovePath(ctx, req, input, ws.Root)
 		},
 	)
 
 	// edit
-	mcp.AddTool(server,
+	addTool(server,
 		&mcp.Tool{
 			Name:        names.Edit,
 			Description: fmt.Sprintf("Edit one file inside an open workspace by replacing exact text blocks. Prefer this over %s for targeted changes. Call open_workspace first and pass workspaceId.", names.Write),
@@ -451,13 +433,6 @@ func (s *Server) registerTools(server *mcp.Server) {
 				return result, tools.EditOutput{}, nil
 			}
 
-			_, err = s.registry.ResolvePath(ws, input.Path)
-			if err != nil {
-				result := &mcp.CallToolResult{}
-				result.SetError(err)
-				return result, tools.EditOutput{}, nil
-			}
-
 			return tools.EditFile(ctx, req, input, ws.Root)
 		},
 	)
@@ -465,7 +440,7 @@ func (s *Server) registerTools(server *mcp.Server) {
 	// Full mode tools: grep, glob, ls
 	if s.cfg.ToolMode == config.ToolModeFull {
 		// grep
-		mcp.AddTool(server,
+		addTool(server,
 			&mcp.Tool{
 				Name:        names.Grep,
 				Description: "Search file contents inside an open workspace. Use this before broad reads when looking for symbols, text, or usage sites. Call open_workspace first and pass workspaceId.",
@@ -483,7 +458,7 @@ func (s *Server) registerTools(server *mcp.Server) {
 		)
 
 		// glob
-		mcp.AddTool(server,
+		addTool(server,
 			&mcp.Tool{
 				Name:        names.Glob,
 				Description: "Find files by glob pattern inside an open workspace. Use this to discover filenames or narrow file sets before reading. Call open_workspace first and pass workspaceId.",
@@ -501,7 +476,7 @@ func (s *Server) registerTools(server *mcp.Server) {
 		)
 
 		// ls
-		mcp.AddTool(server,
+		addTool(server,
 			&mcp.Tool{
 				Name:        names.Ls,
 				Description: "List a directory inside an open workspace. Use this for directory inspection before reading files. Call open_workspace first and pass workspaceId.",
@@ -531,7 +506,7 @@ func (s *Server) registerTools(server *mcp.Server) {
 		)
 	}
 
-	mcp.AddTool(server,
+	addTool(server,
 		&mcp.Tool{
 			Name:        names.Bash,
 			Description: bashDesc,
