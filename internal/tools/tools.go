@@ -6,11 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -457,7 +459,11 @@ func GrepFiles(ctx context.Context, req *mcp.CallToolRequest, input GrepInput, w
 	skipped := 0
 	start := time.Now()
 
-	_ = filepath.Walk(searchPath, func(path string, info os.FileInfo, err error) error {
+	// One read buffer for the whole walk instead of a fresh 64 KiB per file,
+	// WalkDir instead of Walk (no extra Lstat per entry), and byte matching so
+	// only matching lines are converted to strings.
+	buffer := make([]byte, 64*1024)
+	_ = filepath.WalkDir(searchPath, func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return nil
 		}
@@ -467,19 +473,27 @@ func GrepFiles(ctx context.Context, req *mcp.CallToolRequest, input GrepInput, w
 		if time.Since(start) > 20*time.Second || matches >= maxSearchMatches {
 			return filepath.SkipAll
 		}
-		if info.IsDir() {
-			if shouldSkipToolDirectory(path, searchPath, info.Name(), runtime.GOOS) {
+		if entry.IsDir() {
+			if shouldSkipToolDirectory(path, searchPath, entry.Name(), runtime.GOOS) {
 				return filepath.SkipDir
 			}
 			return nil
 		}
 		if include != "" {
-			ok, _ := filepath.Match(include, info.Name())
+			ok, _ := filepath.Match(include, entry.Name())
 			if !ok {
 				return nil
 			}
 		}
-		if info.Size() > maxSearchFileBytes || looksBinaryPath(path) {
+		if looksBinaryPath(path) {
+			skipped++
+			return nil
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return nil
+		}
+		if info.Size() > maxSearchFileBytes {
 			skipped++
 			return nil
 		}
@@ -491,14 +505,18 @@ func GrepFiles(ctx context.Context, req *mcp.CallToolRequest, input GrepInput, w
 		defer file.Close()
 
 		scanner := bufio.NewScanner(file)
-		scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+		scanner.Buffer(buffer, 1024*1024)
 		lineNo := 0
+		var rel string
 		for scanner.Scan() {
 			lineNo++
-			text := scanner.Text()
-			if re.MatchString(text) {
-				rel, _ := filepath.Rel(wsRoot, path)
-				lines = append(lines, fmt.Sprintf("%s:%d:%s", filepath.ToSlash(rel), lineNo, text))
+			line := scanner.Bytes()
+			if re.Match(line) {
+				if rel == "" {
+					rel, _ = filepath.Rel(wsRoot, path)
+					rel = filepath.ToSlash(rel)
+				}
+				lines = append(lines, rel+":"+strconv.Itoa(lineNo)+":"+string(line))
 				matches++
 				if matches >= maxSearchMatches {
 					break
@@ -547,27 +565,29 @@ func FindFiles(ctx context.Context, req *mcp.CallToolRequest, input GlobInput, w
 
 	var matches []string
 
-	filepath.Walk(searchPath, func(path string, info os.FileInfo, err error) error {
+	_ = filepath.WalkDir(searchPath, func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return nil
 		}
 		if ctx.Err() != nil || len(matches) >= maxSearchMatches {
 			return filepath.SkipAll
 		}
-		if info.IsDir() {
-			if shouldSkipToolDirectory(path, searchPath, info.Name(), runtime.GOOS) {
+		if entry.IsDir() {
+			if shouldSkipToolDirectory(path, searchPath, entry.Name(), runtime.GOOS) {
 				return filepath.SkipDir
 			}
 			return nil
 		}
-		if looksBinaryPath(path) || info.Size() > maxSearchFileBytes {
+		// Match the name before asking for file info (a syscall on Unix).
+		if matched, _ := filepath.Match(input.Pattern, entry.Name()); !matched || looksBinaryPath(path) {
 			return nil
 		}
-		matched, _ := filepath.Match(input.Pattern, info.Name())
-		if matched {
-			rel, _ := filepath.Rel(wsRoot, path)
-			matches = append(matches, filepath.ToSlash(rel))
+		info, err := entry.Info()
+		if err != nil || info.Size() > maxSearchFileBytes {
+			return nil
 		}
+		rel, _ := filepath.Rel(wsRoot, path)
+		matches = append(matches, filepath.ToSlash(rel))
 		return nil
 	})
 
@@ -727,14 +747,17 @@ func shellCommandForOS(preferredShell, goos, command string) (string, []string) 
 	return preferredShell, []string{"-c", command}
 }
 
+// shouldSkipToolDirectory skips heavy or generated directories below the
+// search root. A directory the caller explicitly asked to search (the search
+// root itself, e.g. path "build") is always searched.
 func shouldSkipToolDirectory(path, searchRoot, name, goos string) bool {
+	if filepath.Clean(path) == filepath.Clean(searchRoot) {
+		return false
+	}
 	if skippedDirs[name] {
 		return true
 	}
-	if goos == "windows" || !unixSkippedDirs[name] {
-		return false
-	}
-	return filepath.Clean(path) != filepath.Clean(searchRoot)
+	return goos != "windows" && unixSkippedDirs[name]
 }
 
 // --- helpers ---
