@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
@@ -64,7 +65,18 @@ type Registry struct {
 	store      *store.Store
 	workspaces map[string]*Workspace
 	mu         sync.RWMutex
+
+	// lastUsedID is the workspace used most recently by this process; it
+	// answers "default"/"latest" without a database query. touchedAt
+	// throttles last_used_at writes (each one is a synchronous SQLite commit,
+	// several milliseconds on Windows) to one per touchInterval per workspace,
+	// plus one whenever the active workspace changes, so the persisted order
+	// used after a restart stays correct.
+	lastUsedID string
+	touchedAt  map[string]time.Time
 }
+
+const touchInterval = 30 * time.Second
 
 // NewRegistry creates a new workspace registry.
 func NewRegistry(cfg *config.Config, s *store.Store) *Registry {
@@ -72,6 +84,7 @@ func NewRegistry(cfg *config.Config, s *store.Store) *Registry {
 		cfg:        cfg,
 		store:      s,
 		workspaces: make(map[string]*Workspace),
+		touchedAt:  make(map[string]time.Time),
 	}
 }
 
@@ -134,6 +147,8 @@ func (r *Registry) openCheckoutWorkspace(rootPath string) (*WorkspaceContext, er
 	// Cache in memory
 	r.mu.Lock()
 	r.workspaces[ws.ID] = ws
+	r.lastUsedID = ws.ID
+	r.touchedAt[ws.ID] = time.Now() // CreateSession stored last_used_at
 	r.mu.Unlock()
 
 	// Load agents files
@@ -175,9 +190,7 @@ func (r *Registry) GetWorkspace(id string) (*Workspace, error) {
 	r.mu.RUnlock()
 
 	if ok {
-		if r.store != nil {
-			r.touch(id)
-		}
+		r.markUsed(id)
 		return ws, nil
 	}
 
@@ -203,16 +216,25 @@ func (r *Registry) GetWorkspace(id string) (*Workspace, error) {
 		r.workspaces[ws.ID] = ws
 		r.mu.Unlock()
 
-		if r.store != nil {
-			r.touch(id)
-		}
+		r.markUsed(id)
 		return ws, nil
 	}
 
 	return nil, fmt.Errorf("unknown workspaceId: %s. Call open_workspace first", id)
 }
 
-func (r *Registry) touch(id string) {
+func (r *Registry) markUsed(id string) {
+	now := time.Now()
+	r.mu.Lock()
+	persist := id != r.lastUsedID || now.Sub(r.touchedAt[id]) >= touchInterval
+	r.lastUsedID = id
+	if persist {
+		r.touchedAt[id] = now
+	}
+	r.mu.Unlock()
+	if !persist || r.store == nil {
+		return
+	}
 	if err := r.store.TouchSession(id); err != nil {
 		log.Debug().Err(err).Str("workspace", id).Msg("could not update workspace last-used time")
 	}
@@ -221,6 +243,12 @@ func (r *Registry) touch(id string) {
 // GetDefaultWorkspace retrieves the latest workspace, or opens the default root
 // if no session exists yet.
 func (r *Registry) GetDefaultWorkspace() (*Workspace, error) {
+	r.mu.RLock()
+	lastUsed := r.lastUsedID
+	r.mu.RUnlock()
+	if lastUsed != "" {
+		return r.GetWorkspace(lastUsed)
+	}
 	if r.store != nil {
 		if session, err := r.store.GetLatestSession(); err == nil {
 			return r.GetWorkspace(session.ID)
