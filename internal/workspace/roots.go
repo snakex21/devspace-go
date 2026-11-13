@@ -132,6 +132,18 @@ func ResolveInRoot(root, inputPath string) (string, error) {
 		return "", fmt.Errorf("path %s is outside workspace root", inputPath)
 	}
 
+	// Fast path: if no existing component below the root is a link or other
+	// reparse point, the path cannot leave the root, whatever the root itself
+	// points to. This costs one Lstat per component instead of two full
+	// EvalSymlinks walks from the volume root.
+	hasLink, err := hasLinkBelowRoot(cleanRoot, candidate)
+	if err != nil {
+		return "", fmt.Errorf("resolve path %s: %w", inputPath, err)
+	}
+	if !hasLink {
+		return candidate, nil
+	}
+
 	realRoot, err := filepath.EvalSymlinks(cleanRoot)
 	if err != nil {
 		// The root may not exist yet (open_workspace creates it); nothing below
@@ -146,6 +158,36 @@ func ResolveInRoot(root, inputPath string) (string, error) {
 		return "", fmt.Errorf("path %s resolves outside workspace root through a link", inputPath)
 	}
 	return candidate, nil
+}
+
+// hasLinkBelowRoot reports whether any existing component of candidate below
+// root is a symlink, junction or other reparse point (Go reports Windows
+// junctions and non-symlink reparse points as ModeIrregular). Components after
+// the first missing one cannot be links. Anything it cannot classify is
+// reported as a link, so the caller falls back to the full check.
+func hasLinkBelowRoot(root, candidate string) (bool, error) {
+	rel, err := filepath.Rel(root, candidate)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return true, nil
+	}
+	if rel == "." {
+		return false, nil
+	}
+	current := root
+	for _, part := range strings.Split(rel, string(filepath.Separator)) {
+		current = filepath.Join(current, part)
+		info, err := os.Lstat(current)
+		if err != nil {
+			if os.IsNotExist(err) || isNotDirectory(err) {
+				return false, nil
+			}
+			return false, err
+		}
+		if info.Mode()&(os.ModeSymlink|os.ModeIrregular) != 0 {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // evalExistingPrefix resolves links in the longest existing prefix of path and
