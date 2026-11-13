@@ -10,9 +10,12 @@ import (
 	"time"
 )
 
+// The instruction-file scan run by open_workspace is bounded on every
+// platform so that opening a huge root (for example a whole drive) returns
+// quickly instead of walking millions of files.
 const (
-	unixWorkspaceWalkMaxFiles = 5000
-	unixWorkspaceWalkTimeout  = 3 * time.Second
+	workspaceWalkMaxFiles = 5000
+	workspaceWalkTimeout  = 3 * time.Second
 )
 
 var workspaceSkippedDirs = map[string]bool{
@@ -233,16 +236,30 @@ func AssertAllowedPath(absPath string, allowedRoots []string) (string, error) {
 // WalkWorkspace walks a directory tree, skipping blacklisted directories.
 func WalkWorkspace(root string, visitor func(path string, info os.FileInfo) error) error {
 	if runtime.GOOS == "windows" {
-		return walkWorkspaceWindows(root, visitor)
+		return walkWorkspaceWindows(root, visitor, workspaceWalkMaxFiles, workspaceWalkTimeout, time.Now)
 	}
-	return walkWorkspaceUnix(root, visitor, unixWorkspaceWalkMaxFiles, unixWorkspaceWalkTimeout, time.Now)
+	return walkWorkspaceUnix(root, visitor, workspaceWalkMaxFiles, workspaceWalkTimeout, time.Now)
 }
 
-// walkWorkspaceWindows intentionally preserves the original Windows traversal.
-func walkWorkspaceWindows(root string, visitor func(path string, info os.FileInfo) error) error {
+// walkWorkspaceWindows keeps the original Windows directory set (only
+// workspaceSkippedDirs are pruned; dot-directories such as .hermes stay
+// visible) but applies the same file-count and time limits as the Unix walk.
+func walkWorkspaceWindows(
+	root string,
+	visitor func(path string, info os.FileInfo) error,
+	maxFiles int,
+	timeout time.Duration,
+	now func() time.Time,
+) error {
+	started := now()
+	filesSeen := 0
+
 	return filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return nil // Skip inaccessible paths
+		}
+		if timeout > 0 && now().Sub(started) >= timeout {
+			return filepath.SkipAll
 		}
 
 		if info.IsDir() {
@@ -250,6 +267,11 @@ func walkWorkspaceWindows(root string, visitor func(path string, info os.FileInf
 				return filepath.SkipDir
 			}
 			return nil
+		}
+
+		filesSeen++
+		if maxFiles > 0 && filesSeen > maxFiles {
+			return filepath.SkipAll
 		}
 
 		return visitor(path, info)

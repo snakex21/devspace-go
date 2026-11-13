@@ -230,6 +230,7 @@ atomically, so a crash while saving never leaves a truncated file.
 | `read` response | 2000 lines by default, max 5000 lines / 4 MiB |
 | `edit` file size | 64 MiB |
 | `grep` / `glob` | 500 matches, files up to 2 MiB, 20 s |
+| `open_workspace` scan for `AGENTS.md` / `CLAUDE.md` | 5000 files / 3 s (Windows, Linux, macOS) |
 | Graceful shutdown | 10 s |
 
 A panic inside a tool is logged and returned to the client as a tool error; it
@@ -243,6 +244,9 @@ no longer terminates the server.
   attached to its Windows job object, can escape the tree kill.
 - Link checks happen before each file operation; a link swapped in by another
   local process between the check and the operation (a race) is not prevented.
+- `open_workspace` stops looking for `AGENTS.md` / `CLAUDE.md` after 5000
+  files or 3 s, so on a very large root (for example a whole drive) instruction
+  files deep in the tree may not be listed; open the project folder instead.
 - Restarting a Quick Tunnel changes its URL; use a provider with a stable URL
   if clients must not be reconfigured.
 
