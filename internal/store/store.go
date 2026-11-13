@@ -38,7 +38,13 @@ func New(stateDir string) (*Store, error) {
 	}
 
 	dbPath := databasePath(stateDir)
-	db, err := sql.Open("sqlite", dbPath+"?_journal_mode=WAL&_foreign_keys=on")
+	// modernc.org/sqlite only understands _pragma=name(value). The former
+	// mattn-style "_journal_mode=WAL&_foreign_keys=on" was silently ignored,
+	// leaving busy_timeout at 0: a second process (or a restart overlapping a
+	// shutdown) failed instantly with SQLITE_BUSY. The journal mode stays at the
+	// effective default (DELETE), which also works on network/USB drives used
+	// for portable installs, where WAL's shared memory does not.
+	db, err := sql.Open("sqlite", dbPath+"?_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)")
 	if err != nil {
 		return nil, fmt.Errorf("open database: %w", err)
 	}
