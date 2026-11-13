@@ -37,6 +37,19 @@ type Server struct {
 	store    *store.Store
 	// tunnelBackoff overrides defaultTunnelBackoff (tests only).
 	tunnelBackoff backoffPolicy
+
+	mcpOnce   sync.Once
+	mcpShared *mcp.Server
+}
+
+// mcpServer returns the MCP server shared by all HTTP requests and SSE
+// sessions. Building one registers every tool and infers its JSON schemas
+// (about 1.3 ms and 15k allocations), which used to happen on every
+// stateless /mcp request. The SDK explicitly supports serving many sessions
+// from one server; the configuration it depends on never changes after New.
+func (s *Server) mcpServer() *mcp.Server {
+	s.mcpOnce.Do(func() { s.mcpShared = s.createMcpServer() })
+	return s.mcpShared
 }
 
 // New creates a new Dev Space Go server.
@@ -116,7 +129,7 @@ func (s *Server) start(ctx context.Context, startTunnel tunnelStarter) error {
 	// Legacy SSE endpoint for MCP clients that still expect /sse.
 	sseHandler := mcp.NewSSEHandler(
 		func(r *http.Request) *mcp.Server {
-			return s.createMcpServer()
+			return s.mcpServer()
 		},
 		&mcp.SSEOptions{DisableLocalhostProtection: true},
 	)
@@ -198,7 +211,7 @@ func tunnelOrigin(address string) string {
 func (s *Server) streamableMCPHandler() http.Handler {
 	return mcp.NewStreamableHTTPHandler(
 		func(r *http.Request) *mcp.Server {
-			return s.createMcpServer()
+			return s.mcpServer()
 		},
 		&mcp.StreamableHTTPOptions{
 			Stateless:                  true,
