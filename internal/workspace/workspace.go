@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
+	"github.com/rs/zerolog/log"
 	"github.com/snakex21/devspace-go/internal/config"
 	"github.com/snakex21/devspace-go/internal/store"
 )
@@ -118,12 +119,16 @@ func (r *Registry) openCheckoutWorkspace(rootPath string) (*WorkspaceContext, er
 	}
 
 	// Persist session
+	// A persistence failure must not block work: the workspace stays usable
+	// in memory, it just cannot be restored by ID after a restart.
 	if r.store != nil {
-		r.store.CreateSession(&store.WorkspaceSession{
+		if err := r.store.CreateSession(&store.WorkspaceSession{
 			ID:   ws.ID,
 			Root: ws.Root,
 			Mode: string(ws.Mode),
-		})
+		}); err != nil {
+			log.Warn().Err(err).Str("workspace", ws.ID).Msg("could not persist workspace session")
+		}
 	}
 
 	// Cache in memory
@@ -171,7 +176,7 @@ func (r *Registry) GetWorkspace(id string) (*Workspace, error) {
 
 	if ok {
 		if r.store != nil {
-			r.store.TouchSession(id)
+			r.touch(id)
 		}
 		return ws, nil
 	}
@@ -199,12 +204,18 @@ func (r *Registry) GetWorkspace(id string) (*Workspace, error) {
 		r.mu.Unlock()
 
 		if r.store != nil {
-			r.store.TouchSession(id)
+			r.touch(id)
 		}
 		return ws, nil
 	}
 
 	return nil, fmt.Errorf("unknown workspaceId: %s. Call open_workspace first", id)
+}
+
+func (r *Registry) touch(id string) {
+	if err := r.store.TouchSession(id); err != nil {
+		log.Debug().Err(err).Str("workspace", id).Msg("could not update workspace last-used time")
+	}
 }
 
 // GetDefaultWorkspace retrieves the latest workspace, or opens the default root
