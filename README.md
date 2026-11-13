@@ -15,6 +15,7 @@ Dev Space Go is a self-hosted MCP server that lets AI assistants read, edit, sea
 - [Tunnel (Remote Access)](#tunnel-remote-access)
 - [Shell Support](#shell-support)
 - [Security](#security)
+- [Robustness and Limits](#robustness-and-limits)
 - [Building from Source](#building-from-source)
 - [Platform Support](#platform-support)
 - [Project Structure](#project-structure)
@@ -77,7 +78,7 @@ No Node.js, no npm, no Python. Single binary.
 | **macOS Intel** | `devspace` (GUI: compile natively) |
 | **macOS M-chip** | `devspace` (GUI: compile natively) |
 
-Requires **Go 1.23+** only if building from source.
+Requires **Go 1.26+** (see `go.mod`) only if building from source.
 
 ---
 
@@ -154,6 +155,12 @@ Use **`/mcp`** with the default Cloudflare Quick Tunnel. Quick Tunnels
 so switching to `/sse` will not fix them. The legacy `/sse` endpoint remains
 available locally or through a provider that supports SSE.
 
+If the tunnel process exits later (network loss, sleep/hibernation, a crash of
+`cloudflared`), Dev Space Go restarts it automatically with exponential backoff
+and jitter (5 s doubling up to 5 min). A restarted Quick Tunnel gets a **new
+URL**, announced in a new TUNNEL ACTIVE banner. If neither `cloudflared` nor
+`ssh` is installed, the server simply stays local and does not retry.
+
 If the public connection fails, check `http://127.0.0.1:7676/healthz` locally
 (adjust the configured host/port) and keep the tunnel log visible. The local
 server remains usable if tunnel startup fails. A tunnel process that exits is
@@ -182,9 +189,62 @@ Set `"shell"` in config.json or choose in the GUI.
 ## Security
 
 - **No built-in authentication** — anyone with the public tunnel URL can use the server
-- **Path containment** — all file ops validated against allowed roots
+- **Path containment** — every tool path (read, write, edit, mkdir, move, ls, grep, glob and the shell working directory) is resolved inside the workspace root; `..`, absolute paths elsewhere and symlinks/junctions pointing outside are rejected
+- **The shell tool is not a sandbox** — `bash` runs arbitrary commands with your user's permissions; path containment only applies to the file tools
 - **Tunnel access** — treat the public tunnel URL as a secret and stop the server when it is not in use
 - **No third-party uploads** — your code never leaves your machine
+
+---
+
+## Robustness and Limits
+
+**Shutdown.** Ctrl+C (or SIGTERM / closing the console window) cancels running
+requests first — open `/sse` streams end and running shell commands are killed
+together with all processes they started — then shuts the HTTP server down
+(at most 10 s) and stops the tunnel. Press Ctrl+C a second time to force-quit
+if shutdown hangs.
+
+**Crash / hard kill.** The tunnel process (`cloudflared`/`ssh`) runs in a
+Windows job object (Linux: parent-death signal) and dies with Dev Space Go even
+after a crash or a Task Manager kill, so no orphaned tunnel keeps publishing
+the port. The workspace database is SQLite with a 5 s busy timeout, so a
+restart that overlaps the previous shutdown waits instead of failing. If the
+port is still taken at startup, the error says whether another Dev Space Go
+instance or a different program holds it.
+
+**Configuration problems** (invalid JSON in `config.json`, a non-numeric
+`PORT`, an allowed root that does not exist, an out-of-range port) are printed
+as warnings at startup and by `devspace doctor`. Config files are written
+atomically, so a crash while saving never leaves a truncated file.
+
+**Limits and timeouts**
+
+| What | Limit |
+|---|---|
+| HTTP request headers | 10 s to arrive, 1 MiB |
+| HTTP request body | 2 min to arrive, 64 MiB |
+| Idle keep-alive connection | 2 min |
+| Shell command | 30 s default, 300 s max; the whole process tree is killed on timeout |
+| Shell output kept | 256 KiB (the rest is counted and discarded) |
+| Shell background processes | left running; output collection stops 2 s after the shell exits |
+| `read` response | 2000 lines by default, max 5000 lines / 4 MiB |
+| `edit` file size | 64 MiB |
+| `grep` / `glob` | 500 matches, files up to 2 MiB, 20 s |
+| Graceful shutdown | 10 s |
+
+A panic inside a tool is logged and returned to the client as a tool error; it
+no longer terminates the server.
+
+**Known limitations**
+
+- macOS has no parent-death signal: after a hard kill (`kill -9`) of Dev Space
+  Go, a running tunnel child can survive there. Normal exits and Ctrl+C are fine.
+- A process the shell tool starts within the first milliseconds, before it is
+  attached to its Windows job object, can escape the tree kill.
+- Link checks happen before each file operation; a link swapped in by another
+  local process between the check and the operation (a race) is not prevented.
+- Restarting a Quick Tunnel changes its URL; use a provider with a stable URL
+  if clients must not be reconfigured.
 
 ---
 
@@ -199,10 +259,18 @@ cd devspace-go
 ./scripts/unix/build.sh          # Linux / Mac
 make -f scripts/unix/Makefile    # Linux / Mac (make)
 
-# Build just for current platform
-go build -o devspace ./cmd/devspace/
-go build -o devspace-gui ./cmd/devspace-gui/
+# Build just for current platform (release flags: smaller binaries)
+go build -trimpath -ldflags="-s -w" -o devspace ./cmd/devspace/
+go build -trimpath -ldflags="-s -w" -o devspace-gui ./cmd/devspace-gui/
+
+# Tests (add -race when a C compiler is available)
+go vet ./...
+go test ./...
 ```
+
+The build scripts use `-trimpath -ldflags="-s -w"`, which strips symbol and
+debug tables and local paths. Panics still print stack traces with function
+names; only debuggers lose symbol information.
 
 ---
 
@@ -230,6 +298,7 @@ devspace-go/
 │   ├── config/             ← Portable config system
 │   ├── locales/            ← 47 language translations
 │   ├── logger/             ← Structured logging (zerolog)
+│   ├── procutil/           ← Child process trees (job objects / process groups)
 │   ├── server/             ← HTTP + MCP + tunnel orchestration
 │   ├── store/              ← SQLite workspace sessions
 │   ├── tools/              ← read, write, edit, grep, glob, ls, bash
