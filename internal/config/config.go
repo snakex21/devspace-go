@@ -83,6 +83,10 @@ type Config struct {
 	SkillPaths    []string      `json:"skillPaths"`
 	AllowedHosts  []string      `json:"allowedHosts"`
 	Logging       LoggingConfig `json:"logging"`
+
+	// Warnings lists problems found while loading (e.g. a malformed
+	// config.json that was ignored). It is never written to disk.
+	Warnings []string `json:"-"`
 }
 
 // DefaultConfig returns a Config with sensible defaults.
@@ -128,7 +132,9 @@ func LoadConfig() *Config {
 		cfg.Host = v
 	}
 	if v := os.Getenv("PORT"); v != "" {
-		fmt.Sscanf(v, "%d", &cfg.Port)
+		if _, err := fmt.Sscanf(v, "%d", &cfg.Port); err != nil {
+			cfg.Warnings = append(cfg.Warnings, fmt.Sprintf("ignoring PORT=%q: not a number", v))
+		}
 	}
 	if v := envValue("ALLOWED_ROOTS"); v != "" {
 		cfg.AllowedRoots = splitAndTrim(v, ",")
@@ -287,7 +293,11 @@ func LoadConfig() *Config {
 					cfg.Logging.TrustProxy = fileConfig.Logging.TrustProxy
 				}
 			}
+		} else {
+			cfg.Warnings = append(cfg.Warnings, fmt.Sprintf("ignoring %s: invalid JSON: %v", configFile, err))
 		}
+	} else if !os.IsNotExist(err) {
+		cfg.Warnings = append(cfg.Warnings, fmt.Sprintf("cannot read %s: %v", configFile, err))
 	}
 
 	if loadedLegacyConfig {
@@ -306,6 +316,62 @@ func LoadConfig() *Config {
 	}
 
 	return cfg
+}
+
+// Problems reports configuration values that will prevent the server from
+// working as expected. They are reported, not fixed, so the user stays in
+// control of the config file.
+func (c *Config) Problems() []string {
+	var problems []string
+	if c.Port < 0 || c.Port > 65535 {
+		problems = append(problems, fmt.Sprintf("port %d is out of range (1-65535)", c.Port))
+	}
+	for _, root := range c.AllowedRoots {
+		if !filepath.IsAbs(root) {
+			problems = append(problems, fmt.Sprintf("allowed root %q is not an absolute path", root))
+			continue
+		}
+		info, err := os.Stat(root)
+		switch {
+		case os.IsNotExist(err):
+			problems = append(problems, fmt.Sprintf("allowed root %s does not exist", root))
+		case err != nil:
+			problems = append(problems, fmt.Sprintf("allowed root %s is not accessible: %v", root, err))
+		case !info.IsDir():
+			problems = append(problems, fmt.Sprintf("allowed root %s is not a directory", root))
+		}
+	}
+	return problems
+}
+
+// WriteFileAtomic writes data to a temporary file in the same directory and
+// renames it over path, so a crash or full disk never leaves a truncated
+// config.json behind.
+func WriteFileAtomic(path string, data []byte, perm os.FileMode) (err error) {
+	temporary, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".tmp-*")
+	if err != nil {
+		return err
+	}
+	temporaryPath := temporary.Name()
+	defer func() {
+		if err != nil {
+			temporary.Close()
+			os.Remove(temporaryPath)
+		}
+	}()
+	if _, err = temporary.Write(data); err != nil {
+		return err
+	}
+	if err = temporary.Sync(); err != nil {
+		return err
+	}
+	if err = temporary.Close(); err != nil {
+		return err
+	}
+	if err = os.Chmod(temporaryPath, perm); err != nil {
+		return err
+	}
+	return os.Rename(temporaryPath, path)
 }
 
 // PortablePath converts a path inside the application directory to a relative

@@ -11,6 +11,9 @@ func main() {
 	// Quick check if already configured — but still allow reconfiguration
 	cfg := config.LoadConfig()
 	locales.Init(cfg.Lang)
+	for _, warning := range cfg.Warnings {
+		fmt.Printf("⚠️  %s\n", warning)
+	}
 	if len(cfg.AllowedRoots) > 0 {
 		fmt.Printf("✅ %s\n", locales.T("gui.configured"))
 		fmt.Printf("   %s %v\n", locales.T("gui.roots"), cfg.AllowedRoots)
