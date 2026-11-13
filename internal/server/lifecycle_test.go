@@ -54,7 +54,10 @@ func TestServerServesBeforeTunnelReadyAndCancelsStartup(t *testing.T) {
 	if err != nil || response.StatusCode != http.StatusOK || !strings.Contains(string(body), `"name":"devspace-go"`) {
 		t.Fatalf("health = %d %q %v", response.StatusCode, body, err)
 	}
-	if err := server.start(ctx, func(context.Context, string) (*tunnelProcess, error) { t.Error("second start launched a tunnel"); return nil, errNoTunnelProvider }); err == nil {
+	if err := server.start(ctx, func(context.Context, string) (*tunnelProcess, error) {
+		t.Error("second start launched a tunnel")
+		return nil, errNoTunnelProvider
+	}); err == nil {
 		t.Fatal("same Server started twice")
 	}
 	cancel()
@@ -102,7 +105,10 @@ func TestServerRepeatedNewInstancesReleasePort(t *testing.T) {
 		entered := make(chan string, 1)
 		done := make(chan error, 1)
 		go func() {
-			done <- server.start(ctx, func(_ context.Context, origin string) (*tunnelProcess, error) { entered <- origin; return nil, errNoTunnelProvider })
+			done <- server.start(ctx, func(_ context.Context, origin string) (*tunnelProcess, error) {
+				entered <- origin
+				return nil, errNoTunnelProvider
+			})
 		}()
 		var origin string
 		select {
