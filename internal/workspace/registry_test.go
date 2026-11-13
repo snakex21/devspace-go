@@ -103,3 +103,74 @@ func TestRegistryRejectsStoredRootNoLongerAllowed(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestDefaultWorkspaceFollowsLastUsedAcrossRestart(t *testing.T) {
+	parent := t.TempDir()
+	stateDir := t.TempDir()
+	cfg := config.DefaultConfig()
+	cfg.AllowedRoots = []string{parent}
+	cfg.AgentDir = filepath.Join(t.TempDir(), "agents")
+
+	s, err := store.New(stateDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	registry := NewRegistry(cfg, s)
+	a, err := registry.OpenWorkspace(filepath.Join(parent, "a"), ModeCheckout, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := registry.OpenWorkspace(filepath.Join(parent, "b"), ModeCheckout, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ws, _ := registry.GetWorkspace("default"); ws.ID != b.Workspace.ID {
+		t.Fatalf("default = %s, want most recently opened b", ws.ID)
+	}
+	// Switching back to a must be reflected immediately and persisted, even
+	// though last_used_at writes are throttled for repeated use.
+	for i := 0; i < 5; i++ {
+		if _, err := registry.GetWorkspace(a.Workspace.ID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if ws, _ := registry.GetWorkspace("latest"); ws.ID != a.Workspace.ID {
+		t.Fatalf("latest = %s, want a", ws.ID)
+	}
+	s.Close()
+
+	// The switch back to a was persisted: after a restart, a is at least as
+	// recent as b (last_used_at has one-second resolution).
+	s, err = store.New(stateDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	if mustSession(t, s, a.Workspace.ID).LastUsedAt.Before(mustSession(t, s, b.Workspace.ID).LastUsedAt) {
+		t.Fatal("switching back to a was not persisted")
+	}
+}
+
+func mustSession(t *testing.T, s *store.Store, id string) *store.WorkspaceSession {
+	t.Helper()
+	session, err := s.GetSession(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return session
+}
+
+func TestDefaultWorkspaceWithoutStoreReusesWorkspace(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.AllowedRoots = []string{t.TempDir()}
+	cfg.AgentDir = filepath.Join(t.TempDir(), "agents")
+	registry := NewRegistry(cfg, nil)
+	first, err := registry.GetWorkspace("default")
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := registry.GetWorkspace("default")
+	if err != nil || second.ID != first.ID {
+		t.Fatalf("default created a new workspace on every call: %v %v", first.ID, second)
+	}
+}
