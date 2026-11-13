@@ -225,16 +225,7 @@ func (r *Registry) GetDefaultWorkspace() (*Workspace, error) {
 
 // ResolvePath resolves a relative path within a workspace to an absolute path.
 func (r *Registry) ResolvePath(ws *Workspace, inputPath string) (string, error) {
-	absPath, err := ResolvePath(inputPath, ws.Root, []string{ws.Root})
-	if err != nil {
-		return "", err
-	}
-
-	if !IsPathInsideRoot(absPath, ws.Root) {
-		return "", fmt.Errorf("path is outside workspace root: %s", inputPath)
-	}
-
-	return absPath, nil
+	return ResolveInRoot(ws.Root, inputPath)
 }
 
 // ResolveWorkingDirectory resolves a working directory for shell commands.
