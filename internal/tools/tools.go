@@ -43,6 +43,8 @@ const (
 	maxToolOutputBytes    = 256 * 1024
 	maxSearchFileBytes    = 2 * 1024 * 1024
 	maxSearchMatches      = 500
+	maxReadOutputBytes    = 4 * 1024 * 1024
+	maxEditFileBytes      = 64 * 1024 * 1024
 )
 
 var skippedDirs = map[string]bool{
@@ -139,24 +141,39 @@ func ReadFile(ctx context.Context, req *mcp.CallToolRequest, input ReadInput, ws
 		scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 		lineNum := 0
 		linesRead := 0
-		var lines []string
-		truncated := false
+		var builder strings.Builder
+		truncatedLines := false
+		truncatedBytes := false
 
 		for scanner.Scan() {
 			lineNum++
 			if input.Offset > 0 && lineNum < input.Offset {
 				continue
 			}
-			lines = append(lines, scanner.Text())
-			linesRead++
 			if input.Limit > 0 && linesRead >= input.Limit {
-				truncated = true
+				// Only report truncation if there really is another line.
+				truncatedLines = true
 				break
 			}
+			line := scanner.Bytes()
+			// 5000 lines of up to 1 MiB each could otherwise build a
+			// multi-gigabyte response.
+			if builder.Len()+len(line)+1 > maxReadOutputBytes {
+				truncatedBytes = true
+				break
+			}
+			if linesRead > 0 {
+				builder.WriteByte('\n')
+			}
+			builder.Write(line)
+			linesRead++
 		}
 
-		content = strings.Join(lines, "\n")
-		if truncated {
+		content = builder.String()
+		switch {
+		case truncatedBytes:
+			content += fmt.Sprintf("\n\n[truncated after %d lines (%d bytes); use offset=%d to read more]", linesRead, builder.Len(), input.Offset+linesRead)
+		case truncatedLines:
 			content += fmt.Sprintf("\n\n[truncated after %d lines; use offset/limit to read more]", input.Limit)
 		}
 		if scanner.Err() != nil {
@@ -355,6 +372,9 @@ func EditFile(ctx context.Context, req *mcp.CallToolRequest, input EditInput, ws
 		return failure, EditOutput{}, nil
 	}
 
+	if info, err := os.Stat(absPath); err == nil && info.Size() > maxEditFileBytes {
+		return errorResult(fmt.Errorf("file is too large to edit (%d bytes, limit %d)", info.Size(), maxEditFileBytes)), EditOutput{}, nil
+	}
 	data, err := os.ReadFile(absPath)
 	if err != nil {
 		result := &mcp.CallToolResult{}
