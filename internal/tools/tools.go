@@ -3,6 +3,7 @@ package tools
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -11,9 +12,11 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/snakex21/devspace-go/internal/procutil"
 	"github.com/snakex21/devspace-go/internal/workspace"
 )
 
@@ -612,7 +615,7 @@ func ListDirectory(ctx context.Context, req *mcp.CallToolRequest, input LsInput,
 		lines = append(lines, fmt.Sprintf("%s %8s %s %s", prefix, sizeStr, modTime, name))
 	}
 
-	result := strings.Join(lines, "\n")
+	result := truncateOutput(strings.Join(lines, "\n"))
 	if result == "" {
 		result = "Empty directory"
 	}
@@ -717,14 +720,89 @@ func shouldSkipToolDirectory(path, searchRoot, name, goos string) bool {
 // --- helpers ---
 
 func runCommand(ctx context.Context, cwd, name string, args []string, timeoutSec int) (string, error) {
-	timeoutCtx, cancel := context.WithTimeout(ctx, time.Duration(timeoutSec)*time.Second)
+	timeout := time.Duration(timeoutSec) * time.Second
+	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	cmd := exec.CommandContext(timeoutCtx, name, args...)
 	cmd.Dir = cwd
+	// Keep at most maxToolOutputBytes in memory; a chatty command must not be
+	// able to exhaust the server's RAM. One writer for both streams makes
+	// os/exec share a single pipe, preserving interleaving like CombinedOutput.
+	output := &cappedBuffer{limit: maxToolOutputBytes}
+	cmd.Stdout = output
+	cmd.Stderr = output
+	// A background process started by the command (e.g. "server &" or
+	// "start /b") inherits the output pipe. Without WaitDelay, Wait would block
+	// until that process exits, hanging the tool call until the timeout and
+	// then forever. Stop collecting output shortly after the shell exits.
+	cmd.WaitDelay = shellWaitDelay
+	// On timeout or client disconnect, kill the shell together with every
+	// process it started, not just the shell itself.
+	tree := procutil.Prepare(cmd, false)
+	if err := tree.Start(); err != nil {
+		return "", err
+	}
+	err := cmd.Wait()
+	tree.Release()
 
-	output, err := cmd.CombinedOutput()
-	return truncateOutput(string(output)), err
+	switch {
+	case errors.Is(timeoutCtx.Err(), context.DeadlineExceeded) && ctx.Err() == nil:
+		err = fmt.Errorf("command timed out after %s and was terminated", timeout)
+	case ctx.Err() != nil:
+		err = fmt.Errorf("command canceled: %w", ctx.Err())
+	case errors.Is(err, exec.ErrWaitDelay):
+		// The shell itself exited successfully; only its background children
+		// still hold the output pipe. They keep running.
+		err = nil
+		output.note("\n[background processes are still running; their further output is not captured]")
+	}
+	return output.String(), err
+}
+
+const shellWaitDelay = 2 * time.Second
+
+// cappedBuffer is an io.Writer that keeps the first limit bytes and counts
+// the rest. os/exec calls Write from one goroutine per pipe; both streams
+// share one pipe here, but a mutex keeps it safe if that ever changes.
+type cappedBuffer struct {
+	mu      sync.Mutex
+	buf     []byte
+	limit   int
+	dropped int64
+	suffix  string
+}
+
+func (b *cappedBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if room := b.limit - len(b.buf); room > 0 {
+		if len(p) <= room {
+			b.buf = append(b.buf, p...)
+			return len(p), nil
+		}
+		b.buf = append(b.buf, p[:room]...)
+		b.dropped += int64(len(p) - room)
+		return len(p), nil
+	}
+	b.dropped += int64(len(p))
+	return len(p), nil
+}
+
+func (b *cappedBuffer) note(text string) {
+	b.mu.Lock()
+	b.suffix += text
+	b.mu.Unlock()
+}
+
+func (b *cappedBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	text := string(b.buf)
+	if b.dropped > 0 {
+		text += fmt.Sprintf("\n\n[output truncated after %d bytes; %d more bytes discarded]", b.limit, b.dropped)
+	}
+	return text + b.suffix
 }
 
 func formatSize(size int64) string {
