@@ -17,7 +17,7 @@ func benchTree(b *testing.B, dirs, files int) string {
 	for i := 0; i < 100; i++ {
 		fmt.Fprintf(&content, "func handler%d(ctx context.Context) error { return process(ctx, %d) }\n", i, i)
 	}
-	content.WriteString("// needle: TODO_BENCH_MARKER\n")
+	content.WriteString("// needle: BENCH_NEEDLE_MARKER\n")
 	data := []byte(content.String())
 	for d := 0; d < dirs; d++ {
 		dir := filepath.Join(root, fmt.Sprintf("pkg%03d", d))
@@ -39,7 +39,7 @@ func BenchmarkGrepFiles(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		result, _, _ := GrepFiles(ctx, nil, GrepInput{Pattern: "TODO_BENCH_MARKER"}, root)
+		result, _, _ := GrepFiles(ctx, nil, GrepInput{Pattern: "BENCH_NEEDLE_MARKER"}, root)
 		if result.IsError {
 			b.Fatal(resultText(result))
 		}
