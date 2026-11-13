@@ -62,6 +62,10 @@ func runServer() {
 }
 
 func runServerWithConfig(cfg *config.Config) {
+	for _, warning := range append(cfg.Warnings, cfg.Problems()...) {
+		fmt.Fprintf(os.Stderr, "Warning: %s\n", warning)
+	}
+
 	// Initialize locale system
 	locales.Init(cfg.Lang)
 	if cfg.Lang == "" {
@@ -138,6 +142,9 @@ func runDoctor() {
 
 	// Check config
 	cfg := config.LoadConfig()
+	for _, warning := range append(cfg.Warnings, cfg.Problems()...) {
+		fmt.Printf("[!] %s\n", warning)
+	}
 	if len(cfg.AllowedRoots) > 0 {
 		fmt.Printf("[ok] Allowed roots: %s\n", strings.Join(cfg.AllowedRoots, ", "))
 	} else {
@@ -233,7 +240,7 @@ func saveConfig(cfg *config.Config) error {
 		return fmt.Errorf("marshal config: %w", err)
 	}
 
-	if err := os.WriteFile(configPath, data, 0600); err != nil {
+	if err := config.WriteFileAtomic(configPath, data, 0600); err != nil {
 		return fmt.Errorf("write config: %w", err)
 	}
 

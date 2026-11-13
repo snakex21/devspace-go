@@ -346,7 +346,7 @@ func saveGUIConfig(cfg *devconfig.Config) error {
 	if err != nil {
 		return fmt.Errorf("marshal config: %w", err)
 	}
-	if err := os.WriteFile(configPath, data, 0600); err != nil {
+	if err := devconfig.WriteFileAtomic(configPath, data, 0600); err != nil {
 		return fmt.Errorf("write config.json: %w", err)
 	}
 
