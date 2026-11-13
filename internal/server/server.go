@@ -26,7 +26,7 @@ import (
 // boolPtr returns a pointer to the given bool value (for ToolAnnotations pointer fields).
 func boolPtr(b bool) *bool { return &b }
 
-const Version = "2.1.0"
+const Version = "2.2.0"
 
 // Server represents the running Dev Space Go server.
 type Server struct {
