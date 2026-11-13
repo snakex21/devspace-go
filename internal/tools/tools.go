@@ -14,7 +14,25 @@ import (
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/snakex21/devspace-go/internal/workspace"
 )
+
+// resolveToolPath maps a tool path argument to an absolute path inside the
+// workspace. Every tool must use it instead of joining paths itself, so that
+// "..", absolute paths and links cannot escape the workspace root.
+func resolveToolPath(wsRoot, inputPath string) (string, *mcp.CallToolResult) {
+	absPath, err := workspace.ResolveInRoot(wsRoot, inputPath)
+	if err != nil {
+		return "", errorResult(err)
+	}
+	return absPath, nil
+}
+
+func errorResult(err error) *mcp.CallToolResult {
+	result := &mcp.CallToolResult{}
+	result.SetError(err)
+	return result
+}
 
 const (
 	defaultReadLimitLines = 2000
@@ -70,8 +88,10 @@ type ReadOutput struct {
 
 // ReadFile reads a file and returns its content.
 func ReadFile(ctx context.Context, req *mcp.CallToolRequest, input ReadInput, wsRoot string) (*mcp.CallToolResult, ReadOutput, error) {
-	absPath := filepath.Join(wsRoot, input.Path)
-	absPath = filepath.Clean(absPath)
+	absPath, failure := resolveToolPath(wsRoot, input.Path)
+	if failure != nil {
+		return failure, ReadOutput{}, nil
+	}
 
 	info, err := os.Stat(absPath)
 	if err != nil {
@@ -196,8 +216,10 @@ type MoveOutput struct {
 
 // WriteFile creates or overwrites a file.
 func WriteFile(ctx context.Context, req *mcp.CallToolRequest, input WriteInput, wsRoot string) (*mcp.CallToolResult, WriteOutput, error) {
-	absPath := filepath.Join(wsRoot, input.Path)
-	absPath = filepath.Clean(absPath)
+	absPath, failure := resolveToolPath(wsRoot, input.Path)
+	if failure != nil {
+		return failure, WriteOutput{}, nil
+	}
 
 	dir := filepath.Dir(absPath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
@@ -222,8 +244,10 @@ func WriteFile(ctx context.Context, req *mcp.CallToolRequest, input WriteInput, 
 
 // MakeDirectory creates a directory and all missing parents inside a workspace.
 func MakeDirectory(ctx context.Context, req *mcp.CallToolRequest, input MkdirInput, wsRoot string) (*mcp.CallToolResult, MkdirOutput, error) {
-	absPath := filepath.Join(wsRoot, input.Path)
-	absPath = filepath.Clean(absPath)
+	absPath, failure := resolveToolPath(wsRoot, input.Path)
+	if failure != nil {
+		return failure, MkdirOutput{}, nil
+	}
 
 	if err := os.MkdirAll(absPath, 0755); err != nil {
 		result := &mcp.CallToolResult{}
@@ -239,8 +263,23 @@ func MakeDirectory(ctx context.Context, req *mcp.CallToolRequest, input MkdirInp
 
 // MovePath moves or renames a file/directory inside a workspace.
 func MovePath(ctx context.Context, req *mcp.CallToolRequest, input MoveInput, wsRoot string) (*mcp.CallToolResult, MoveOutput, error) {
-	sourceAbs := filepath.Clean(filepath.Join(wsRoot, input.SourcePath))
-	targetAbs := filepath.Clean(filepath.Join(wsRoot, input.TargetPath))
+	sourceAbs, failure := resolveToolPath(wsRoot, input.SourcePath)
+	if failure != nil {
+		return failure, MoveOutput{}, nil
+	}
+	targetAbs, failure := resolveToolPath(wsRoot, input.TargetPath)
+	if failure != nil {
+		return failure, MoveOutput{}, nil
+	}
+	// Moving the root away, or overwriting it (RemoveAll), would destroy the
+	// whole workspace.
+	cleanRoot := filepath.Clean(wsRoot)
+	if workspace.IsPathInsideRoot(cleanRoot, sourceAbs) || workspace.IsPathInsideRoot(cleanRoot, targetAbs) {
+		return errorResult(fmt.Errorf("cannot move the workspace root or one of its parents")), MoveOutput{}, nil
+	}
+	if workspace.IsPathInsideRoot(targetAbs, sourceAbs) && !samePath(targetAbs, sourceAbs) {
+		return errorResult(fmt.Errorf("cannot move %s into itself", input.SourcePath)), MoveOutput{}, nil
+	}
 
 	if _, err := os.Stat(sourceAbs); err != nil {
 		result := &mcp.CallToolResult{}
@@ -308,8 +347,10 @@ type EditOutput struct {
 
 // EditFile performs find-and-replace edits on a file.
 func EditFile(ctx context.Context, req *mcp.CallToolRequest, input EditInput, wsRoot string) (*mcp.CallToolResult, EditOutput, error) {
-	absPath := filepath.Join(wsRoot, input.Path)
-	absPath = filepath.Clean(absPath)
+	absPath, failure := resolveToolPath(wsRoot, input.Path)
+	if failure != nil {
+		return failure, EditOutput{}, nil
+	}
 
 	data, err := os.ReadFile(absPath)
 	if err != nil {
@@ -375,9 +416,9 @@ type GrepOutput struct {
 
 // GrepFiles searches file contents for a pattern.
 func GrepFiles(ctx context.Context, req *mcp.CallToolRequest, input GrepInput, wsRoot string) (*mcp.CallToolResult, GrepOutput, error) {
-	searchPath := wsRoot
-	if input.Path != "" {
-		searchPath = filepath.Join(wsRoot, input.Path)
+	searchPath, failure := resolveToolPath(wsRoot, input.Path)
+	if failure != nil {
+		return failure, GrepOutput{}, nil
 	}
 
 	re, err := regexp.Compile(input.Pattern)
@@ -476,9 +517,9 @@ type GlobOutput struct {
 
 // FindFiles finds files matching a glob pattern.
 func FindFiles(ctx context.Context, req *mcp.CallToolRequest, input GlobInput, wsRoot string) (*mcp.CallToolResult, GlobOutput, error) {
-	searchPath := wsRoot
-	if input.Path != "" {
-		searchPath = filepath.Join(wsRoot, input.Path)
+	searchPath, failure := resolveToolPath(wsRoot, input.Path)
+	if failure != nil {
+		return failure, GlobOutput{}, nil
 	}
 
 	var matches []string
@@ -535,7 +576,10 @@ type LsOutput struct {
 
 // ListDirectory lists the contents of a directory.
 func ListDirectory(ctx context.Context, req *mcp.CallToolRequest, input LsInput, wsRoot string) (*mcp.CallToolResult, LsOutput, error) {
-	absPath := filepath.Join(wsRoot, input.Path)
+	absPath, failure := resolveToolPath(wsRoot, input.Path)
+	if failure != nil {
+		return failure, LsOutput{}, nil
+	}
 
 	entries, err := os.ReadDir(absPath)
 	if err != nil {
@@ -595,9 +639,9 @@ type BashOutput struct {
 
 // RunBash executes a shell command. Uses PowerShell on Windows, bash on Unix.
 func RunBash(ctx context.Context, req *mcp.CallToolRequest, input BashInput, wsRoot string) (*mcp.CallToolResult, BashOutput, error) {
-	cwd := wsRoot
-	if input.WorkingDirectory != "" {
-		cwd = filepath.Join(wsRoot, input.WorkingDirectory)
+	cwd, failure := resolveToolPath(wsRoot, input.WorkingDirectory)
+	if failure != nil {
+		return failure, BashOutput{}, nil
 	}
 
 	timeout := 30
@@ -694,6 +738,10 @@ func formatSize(size int64) string {
 		exp++
 	}
 	return fmt.Sprintf("%.1f %cB", float64(size)/float64(div), "KMGT"[exp])
+}
+
+func samePath(a, b string) bool {
+	return workspace.IsPathInsideRoot(a, b) && workspace.IsPathInsideRoot(b, a)
 }
 
 func escapePS(s string) string {
