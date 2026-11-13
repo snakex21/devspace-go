@@ -86,7 +86,7 @@ func TestStartTunnelRetriesCloudflaredBeforePinggy(t *testing.T) {
 
 	cloudflaredCalls := 0
 	pinggyCalls := 0
-	tunnel := server.startTunnelWithProviders(context.Background(), "http://127.0.0.1:7676",
+	tunnel, _ := server.startTunnelWithProviders(context.Background(), "http://127.0.0.1:7676",
 		func(context.Context, string) (*tunnelProcess, error) {
 			cloudflaredCalls++
 			if cloudflaredCalls == cloudflaredMaxAttempts {
@@ -117,7 +117,7 @@ func TestStartTunnelFallsBackToPinggyAfterCloudflaredRetries(t *testing.T) {
 
 	cloudflaredCalls := 0
 	pinggyCalls := 0
-	tunnel := server.startTunnelWithProviders(context.Background(), "http://127.0.0.1:7676",
+	tunnel, _ := server.startTunnelWithProviders(context.Background(), "http://127.0.0.1:7676",
 		func(context.Context, string) (*tunnelProcess, error) {
 			cloudflaredCalls++
 			return nil, nil
