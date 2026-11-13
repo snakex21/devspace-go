@@ -52,7 +52,7 @@ func TestWindowsWorkspaceWalkKeepsOriginalDirectorySet(t *testing.T) {
 			foundHermes = true
 		}
 		return nil
-	})
+	}, 100, time.Minute, time.Now)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,5 +131,62 @@ func TestUnixWorkspaceWalkAllowsExplicitSkippedRoot(t *testing.T) {
 	}
 	if visited != 1 {
 		t.Fatalf("visited %d files, want 1", visited)
+	}
+}
+
+func TestWindowsWorkspaceWalkHonorsFileLimit(t *testing.T) {
+	root := t.TempDir()
+	for i := 0; i < 5; i++ {
+		path := filepath.Join(root, string(rune('a'+i))+".txt")
+		if err := os.WriteFile(path, []byte("test"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	visited := 0
+	err := walkWorkspaceWindows(root, func(string, os.FileInfo) error {
+		visited++
+		return nil
+	}, 2, time.Minute, time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if visited != 2 {
+		t.Fatalf("visited %d files, want 2", visited)
+	}
+}
+
+func TestWindowsWorkspaceWalkHonorsTimeout(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "AGENTS.md"), []byte("test"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	started := time.Unix(1, 0)
+	clockCalls := 0
+	now := func() time.Time {
+		clockCalls++
+		if clockCalls == 1 {
+			return started
+		}
+		return started.Add(2 * time.Second)
+	}
+
+	visited := 0
+	err := walkWorkspaceWindows(root, func(string, os.FileInfo) error {
+		visited++
+		return nil
+	}, 100, time.Second, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if visited != 0 {
+		t.Fatalf("visited %d files after timeout, want 0", visited)
+	}
+}
+
+func TestWorkspaceWalkLimitsMatchAcrossPlatforms(t *testing.T) {
+	if workspaceWalkMaxFiles != 5000 || workspaceWalkTimeout != 3*time.Second {
+		t.Fatalf("walk limits = %d files / %v, want 5000 / 3s", workspaceWalkMaxFiles, workspaceWalkTimeout)
 	}
 }
