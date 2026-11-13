@@ -35,6 +35,8 @@ type Server struct {
 	started  bool
 	registry *workspace.Registry
 	store    *store.Store
+	// tunnelBackoff overrides defaultTunnelBackoff (tests only).
+	tunnelBackoff backoffPolicy
 }
 
 // New creates a new Dev Space Go server.
@@ -69,7 +71,7 @@ func (s *Server) StartContext(ctx context.Context) error {
 	return s.start(ctx, s.startTunnel)
 }
 
-func (s *Server) start(ctx context.Context, startTunnel func(context.Context, string) *tunnelProcess) error {
+func (s *Server) start(ctx context.Context, startTunnel tunnelStarter) error {
 	s.startMu.Lock()
 	if s.started {
 		s.startMu.Unlock()
@@ -123,20 +125,13 @@ func (s *Server) start(ctx context.Context, startTunnel func(context.Context, st
 	go func() { serveDone <- httpServer.Serve(listener) }()
 
 	tunnelDone := make(chan struct{})
+	policy := s.tunnelBackoff
+	if policy.base <= 0 {
+		policy = defaultTunnelBackoff
+	}
 	go func() {
 		defer close(tunnelDone)
-		tunnel := startTunnel(ctx, tunnelOrigin(listener.Addr().String()))
-		if tunnel == nil {
-			return
-		}
-		defer tunnel.stop()
-		select {
-		case <-ctx.Done():
-		case <-tunnel.done:
-			if ctx.Err() == nil {
-				log.Error().Err(tunnel.err).Msg("tunnel exited; public URL is no longer active; server remains available locally")
-			}
-		}
+		superviseTunnel(ctx, tunnelOrigin(listener.Addr().String()), startTunnel, policy)
 	}()
 
 	log.Info().Str("address", listener.Addr().String()).Msg(locales.T("server.listening"))

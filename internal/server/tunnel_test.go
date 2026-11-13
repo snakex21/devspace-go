@@ -175,7 +175,7 @@ func TestTunnelProvidersStopRetryingOnCancellation(t *testing.T) {
 	calls := 0
 	provider := func(context.Context, string) (*tunnelProcess, error) { calls++; cancel(); return nil, context.Canceled }
 	s := &Server{}
-	if p := s.startTunnelWithProviders(ctx, "http://127.0.0.1:1", provider, provider); p != nil {
+	if p, _ := s.startTunnelWithProviders(ctx, "http://127.0.0.1:1", provider, provider); p != nil {
 		t.Fatal("canceled provider returned a process")
 	}
 	if calls != 1 {

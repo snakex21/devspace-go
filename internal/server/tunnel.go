@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/rand/v2"
 	"net"
 	"net/http"
 	"net/url"
@@ -21,6 +22,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"github.com/snakex21/devspace-go/internal/locales"
+	"github.com/snakex21/devspace-go/internal/procutil"
 )
 
 const (
@@ -51,37 +53,123 @@ func (p *tunnelProcess) stop() {
 
 type tunnelProvider func(context.Context, string) (*tunnelProcess, error)
 
-func (s *Server) startTunnel(ctx context.Context, origin string) *tunnelProcess {
+// tunnelStarter launches one tunnel. It returns errNoTunnelProvider when no
+// tunnel program is installed, so the supervisor does not retry forever.
+type tunnelStarter func(context.Context, string) (*tunnelProcess, error)
+
+var errNoTunnelProvider = errors.New("no tunnel program (cloudflared or ssh) found")
+
+func (s *Server) startTunnel(ctx context.Context, origin string) (*tunnelProcess, error) {
 	return s.startTunnelWithProviders(ctx, origin, s.startCloudflared, s.startPinggy)
 }
 
-func (s *Server) startTunnelWithProviders(ctx context.Context, origin string, cloudflared, pinggy tunnelProvider) *tunnelProcess {
+func (s *Server) startTunnelWithProviders(ctx context.Context, origin string, cloudflared, pinggy tunnelProvider) (*tunnelProcess, error) {
 	providers := []tunnelProvider{}
 	for attempt := 0; attempt < cloudflaredMaxAttempts; attempt++ {
 		providers = append(providers, cloudflared)
 	}
 	providers = append(providers, pinggy)
+	var lastErr error
 	for _, provider := range providers {
 		if ctx.Err() != nil {
-			return nil
+			return nil, ctx.Err()
 		}
 		tunnel, err := provider(ctx, origin)
 		if err == nil && tunnel != nil {
 			if ctx.Err() != nil {
 				tunnel.stop()
-				return nil
+				return nil, ctx.Err()
 			}
 			printTunnelURL(tunnel.url)
-			return tunnel
+			return tunnel, nil
 		}
-		if err != nil && ctx.Err() == nil {
-			log.Warn().Err(err).Msg("tunnel startup failed")
+		if err != nil {
+			lastErr = err
+			if ctx.Err() == nil {
+				log.Warn().Err(err).Msg("tunnel startup failed")
+			}
 		}
 	}
-	if ctx.Err() == nil {
-		log.Warn().Msg("no tunnel is ready; server remains available locally")
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
 	}
-	return nil
+	if lastErr == nil {
+		return nil, errNoTunnelProvider
+	}
+	log.Warn().Msg("no tunnel is ready; server remains available locally")
+	return nil, lastErr
+}
+
+// backoffPolicy spaces out tunnel restarts: exponential growth from base up
+// to max, with "equal jitter" (a random delay in [d/2, d]) so that many
+// instances do not retry in lockstep. A tunnel that stayed up for at least
+// resetAfter counts as healthy, and the next failure starts from base again.
+type backoffPolicy struct {
+	base       time.Duration
+	max        time.Duration
+	resetAfter time.Duration
+}
+
+var defaultTunnelBackoff = backoffPolicy{base: 5 * time.Second, max: 5 * time.Minute, resetAfter: 2 * time.Minute}
+
+func (p backoffPolicy) delay(attempt int, random func(int64) int64) time.Duration {
+	d := p.base
+	for i := 0; i < attempt && d < p.max; i++ {
+		d *= 2
+	}
+	if d > p.max {
+		d = p.max
+	}
+	half := d / 2
+	if half <= 0 {
+		return d
+	}
+	return half + time.Duration(random(int64(half)+1))
+}
+
+// superviseTunnel keeps a public tunnel running until ctx is canceled. When
+// the tunnel process exits (network loss, sleep/hibernation, a crash of the
+// tunnel program) it is restarted with backoff. A restarted Quick Tunnel gets
+// a new URL, which is printed in a new TUNNEL ACTIVE banner.
+func superviseTunnel(ctx context.Context, origin string, start tunnelStarter, policy backoffPolicy) {
+	attempt := 0
+	for {
+		tunnel, err := start(ctx, origin)
+		if ctx.Err() != nil {
+			if tunnel != nil {
+				tunnel.stop()
+			}
+			return
+		}
+		if errors.Is(err, errNoTunnelProvider) {
+			log.Info().Msg("no tunnel program found; server is available locally only")
+			return
+		}
+		if tunnel != nil {
+			startedAt := time.Now()
+			select {
+			case <-ctx.Done():
+				tunnel.stop()
+				return
+			case <-tunnel.done:
+				tunnel.stop()
+				log.Error().Err(tunnel.err).Msg("tunnel exited; public URL is no longer active; server remains available locally")
+			}
+			if time.Since(startedAt) >= policy.resetAfter {
+				attempt = 0
+			}
+		}
+		delay := policy.delay(attempt, rand.Int64N)
+		attempt++
+		log.Warn().Dur("retry_in", delay).Int("attempt", attempt).Msg("restarting tunnel")
+		timer := time.NewTimer(delay)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return
+		case <-timer.C:
+		}
+	}
 }
 
 func (s *Server) startCloudflared(ctx context.Context, origin string) (*tunnelProcess, error) {
@@ -141,11 +229,15 @@ func startTunnelProcess(parent context.Context, command func(context.Context) *e
 	cmd.Stdout = &tunnelOutput{onLine: onLine}
 	cmd.Stderr = &tunnelOutput{onLine: onLine}
 	cmd.WaitDelay = 2 * time.Second
-	if err := cmd.Start(); err != nil {
+	// The tunnel must never outlive this process: an orphaned tunnel would keep
+	// publishing the port (and a later instance on it) under the old URL.
+	// The job object / parent-death signal also covers crashes and hard kills.
+	tree := procutil.Prepare(cmd, true)
+	if err := tree.Start(); err != nil {
 		cancel()
 		return nil, err
 	}
-	go func() { p.err = cmd.Wait(); close(p.done) }()
+	go func() { p.err = cmd.Wait(); tree.Release(); close(p.done) }()
 	keep := false
 	defer func() {
 		if !keep {

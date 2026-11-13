@@ -31,11 +31,11 @@ func TestServerServesBeforeTunnelReadyAndCancelsStartup(t *testing.T) {
 	stopped := make(chan struct{})
 	finished := make(chan error, 1)
 	go func() {
-		finished <- server.start(ctx, func(ctx context.Context, origin string) *tunnelProcess {
+		finished <- server.start(ctx, func(ctx context.Context, origin string) (*tunnelProcess, error) {
 			originReady <- origin
 			<-ctx.Done()
 			close(stopped)
-			return nil
+			return nil, ctx.Err()
 		})
 	}()
 	var origin string
@@ -54,7 +54,7 @@ func TestServerServesBeforeTunnelReadyAndCancelsStartup(t *testing.T) {
 	if err != nil || response.StatusCode != http.StatusOK || !strings.Contains(string(body), `"name":"devspace-go"`) {
 		t.Fatalf("health = %d %q %v", response.StatusCode, body, err)
 	}
-	if err := server.start(ctx, func(context.Context, string) *tunnelProcess { t.Error("second start launched a tunnel"); return nil }); err == nil {
+	if err := server.start(ctx, func(context.Context, string) (*tunnelProcess, error) { t.Error("second start launched a tunnel"); return nil, errNoTunnelProvider }); err == nil {
 		t.Fatal("same Server started twice")
 	}
 	cancel()
@@ -84,9 +84,9 @@ func TestServerBindFailureNeverStartsTunnel(t *testing.T) {
 	defer listener.Close()
 	server := lifecycleServer(t)
 	server.cfg.Port = listener.Addr().(*net.TCPAddr).Port
-	err = server.start(context.Background(), func(context.Context, string) *tunnelProcess {
+	err = server.start(context.Background(), func(context.Context, string) (*tunnelProcess, error) {
 		t.Error("tunnel launched despite occupied port")
-		return nil
+		return nil, errNoTunnelProvider
 	})
 	if err == nil || !strings.Contains(err.Error(), "listen") {
 		t.Fatalf("got %v", err)
@@ -102,7 +102,7 @@ func TestServerRepeatedNewInstancesReleasePort(t *testing.T) {
 		entered := make(chan string, 1)
 		done := make(chan error, 1)
 		go func() {
-			done <- server.start(ctx, func(_ context.Context, origin string) *tunnelProcess { entered <- origin; return nil })
+			done <- server.start(ctx, func(_ context.Context, origin string) (*tunnelProcess, error) { entered <- origin; return nil, errNoTunnelProvider })
 		}()
 		var origin string
 		select {
@@ -140,9 +140,9 @@ func TestServerCanceledContextDoesNotStartTunnel(t *testing.T) {
 	server := lifecycleServer(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	if err := server.start(ctx, func(context.Context, string) *tunnelProcess {
+	if err := server.start(ctx, func(context.Context, string) (*tunnelProcess, error) {
 		t.Error("tunnel launched with canceled context")
-		return nil
+		return nil, errNoTunnelProvider
 	}); err != context.Canceled {
 		t.Fatalf("got %v", err)
 	}
