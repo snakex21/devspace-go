@@ -1,6 +1,7 @@
 package workspace
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -89,6 +90,11 @@ func ResolvePath(inputPath, cwd string, allowedRoots []string) (string, error) {
 	return "", fmt.Errorf("path %s is outside allowed roots", inputPath)
 }
 
+// ErrOutsideRoot marks a path that is well-formed but lies outside the
+// workspace root (lexically or through a link). Callers may then consult the
+// extra-roots policy; every other ResolveInRoot error is final.
+var ErrOutsideRoot = errors.New("outside workspace root")
+
 // ResolveInRoot resolves inputPath (relative to root, or absolute) and verifies
 // that the result stays inside root, both lexically and after following any
 // symlinks or junctions in the part of the path that already exists. An empty
@@ -106,10 +112,49 @@ func ResolveInRoot(root, inputPath string) (string, error) {
 		}
 		cleanRoot = absRoot
 	}
+
+	candidate, err := lexicalCandidate(cleanRoot, inputPath)
+	if err != nil {
+		return "", err
+	}
+
+	if !IsPathInsideRoot(candidate, cleanRoot) {
+		return "", fmt.Errorf("path %s is outside workspace root: %w", inputPath, ErrOutsideRoot)
+	}
+
+	// Fast path: if no existing component below the root is a link or other
+	// reparse point, the path cannot leave the root, whatever the root itself
+	// points to. This costs one Lstat per component instead of two full
+	// EvalSymlinks walks from the volume root.
+	hasLink, err := hasLinkBelowRoot(cleanRoot, candidate)
+	if err != nil {
+		return "", fmt.Errorf("resolve path %s: %w", inputPath, err)
+	}
+	if !hasLink {
+		return candidate, nil
+	}
+
+	realRoot, err := Canonicalize(cleanRoot)
+	if err != nil {
+		return "", fmt.Errorf("resolve workspace root: %w", err)
+	}
+	realCandidate, err := Canonicalize(candidate)
+	if err != nil {
+		return "", fmt.Errorf("resolve path %s: %w", inputPath, err)
+	}
+	if !IsPathInsideRoot(realCandidate, realRoot) {
+		return "", fmt.Errorf("path %s resolves outside workspace root through a link: %w", inputPath, ErrOutsideRoot)
+	}
+	return candidate, nil
+}
+
+// lexicalCandidate turns a tool path argument into a cleaned absolute path
+// without touching the filesystem: "" is root, absolute paths stay, "~/" is
+// the home directory and anything else is joined onto root.
+func lexicalCandidate(cleanRoot, inputPath string) (string, error) {
 	if strings.ContainsRune(inputPath, 0) {
 		return "", fmt.Errorf("path contains a NUL byte")
 	}
-
 	var candidate string
 	switch {
 	case strings.TrimSpace(inputPath) == "":
@@ -126,40 +171,11 @@ func ResolveInRoot(root, inputPath string) (string, error) {
 		// A Windows drive-relative or rooted path ("C:x", `\x`) is neither
 		// absolute nor relative to root; joining it would hide that ambiguity.
 		if filepath.VolumeName(inputPath) != "" || (runtime.GOOS == "windows" && (strings.HasPrefix(inputPath, `\`) || strings.HasPrefix(inputPath, "/"))) {
-			return "", fmt.Errorf("path %s is outside workspace root", inputPath)
+			return "", fmt.Errorf("path %s is outside workspace root (drive-relative or rooted paths are ambiguous; use an absolute path)", inputPath)
 		}
 		candidate = filepath.Clean(filepath.Join(cleanRoot, inputPath))
 	}
 
-	if !IsPathInsideRoot(candidate, cleanRoot) {
-		return "", fmt.Errorf("path %s is outside workspace root", inputPath)
-	}
-
-	// Fast path: if no existing component below the root is a link or other
-	// reparse point, the path cannot leave the root, whatever the root itself
-	// points to. This costs one Lstat per component instead of two full
-	// EvalSymlinks walks from the volume root.
-	hasLink, err := hasLinkBelowRoot(cleanRoot, candidate)
-	if err != nil {
-		return "", fmt.Errorf("resolve path %s: %w", inputPath, err)
-	}
-	if !hasLink {
-		return candidate, nil
-	}
-
-	realRoot, err := filepath.EvalSymlinks(cleanRoot)
-	if err != nil {
-		// The root may not exist yet (open_workspace creates it); nothing below
-		// it can be a link then.
-		return candidate, nil
-	}
-	realCandidate, err := evalExistingPrefix(candidate)
-	if err != nil {
-		return "", fmt.Errorf("resolve path %s: %w", inputPath, err)
-	}
-	if !IsPathInsideRoot(realCandidate, realRoot) {
-		return "", fmt.Errorf("path %s resolves outside workspace root through a link", inputPath)
-	}
 	return candidate, nil
 }
 
@@ -191,34 +207,6 @@ func hasLinkBelowRoot(root, candidate string) (bool, error) {
 		}
 	}
 	return false, nil
-}
-
-// evalExistingPrefix resolves links in the longest existing prefix of path and
-// re-appends the components that do not exist yet.
-func evalExistingPrefix(path string) (string, error) {
-	existing := path
-	var missing []string
-	for {
-		if _, err := os.Lstat(existing); err == nil {
-			break
-		} else if !os.IsNotExist(err) && !isNotDirectory(err) {
-			return "", err
-		}
-		parent := filepath.Dir(existing)
-		if parent == existing {
-			return path, nil
-		}
-		missing = append(missing, filepath.Base(existing))
-		existing = parent
-	}
-	resolved, err := filepath.EvalSymlinks(existing)
-	if err != nil {
-		return "", err
-	}
-	for i := len(missing) - 1; i >= 0; i-- {
-		resolved = filepath.Join(resolved, missing[i])
-	}
-	return resolved, nil
 }
 
 // AssertAllowedPath checks that the absolute path is inside one of the allowed roots.

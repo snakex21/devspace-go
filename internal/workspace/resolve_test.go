@@ -112,6 +112,46 @@ func TestIsPathInsideRootCaseSensitivityMatchesPlatform(t *testing.T) {
 	}
 }
 
+// TestResolveInRootRejectsJunctionEscape covers NTFS junctions explicitly.
+// filepath.EvalSymlinks stopped resolving them in Go 1.23 (mount points are
+// left alone), so a check based on it let a junction inside the workspace
+// point anywhere on the disk. makeDirLink only falls back to junctions when
+// symlinks cannot be created, which hid this on machines in Developer Mode.
+func TestResolveInRootRejectsJunctionEscape(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("junctions are Windows-only")
+	}
+	parent := t.TempDir()
+	root := filepath.Join(parent, "ws")
+	outside := filepath.Join(parent, "outside")
+	for _, dir := range []string{root, outside} {
+		if err := os.Mkdir(dir, 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	makeJunction(t, outside, filepath.Join(root, "junction"))
+	for _, input := range []string{"junction", "junction/secret.txt", "junction/new/file.txt"} {
+		if got, err := ResolveInRoot(root, input); err == nil {
+			t.Errorf("ResolveInRoot(%q) = %q through a junction, want error", input, got)
+		}
+	}
+	// A junction that stays inside the root remains usable.
+	if err := os.Mkdir(filepath.Join(root, "real"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	makeJunction(t, filepath.Join(root, "real"), filepath.Join(root, "alias"))
+	if _, err := ResolveInRoot(root, "alias/file.txt"); err != nil {
+		t.Errorf("internal junction rejected: %v", err)
+	}
+}
+
+func makeJunction(t *testing.T, target, link string) {
+	t.Helper()
+	if output, err := exec.Command("cmd", "/c", "mklink", "/J", link, target).CombinedOutput(); err != nil {
+		t.Skipf("cannot create junction: %v %s", err, output)
+	}
+}
+
 // makeDirLink creates a directory symlink, falling back to an NTFS junction on
 // Windows where symlinks need Developer Mode or elevation. Junctions are the
 // link type an unprivileged process can actually create there.
