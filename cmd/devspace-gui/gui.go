@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -70,6 +69,7 @@ type guiWidgets struct {
 	extraEntry  *widget.Entry
 	extraRemote *widget.Check
 	extraBrowse *widget.Button
+	access      *accessSection
 	urlEntry    *widget.Entry
 	shellSelect *widget.Select
 	langSelect  *widget.Select
@@ -103,6 +103,7 @@ func (gw *guiWidgets) applyLang() {
 	gw.extraEntry.SetPlaceHolder(locales.T("gui.extra_roots_placeholder"))
 	gw.extraRemote.SetText(locales.T("gui.extra_roots_remote"))
 	gw.extraBrowse.SetText(locales.T("gui.browse"))
+	gw.access.relabel()
 	gw.urlEntry.SetPlaceHolder(locales.T("gui.url_placeholder"))
 	gw.portEntry.Validator = func(s string) error {
 		var p int
@@ -121,8 +122,9 @@ func (gw *guiWidgets) rebuildForm() {
 	form.Append(locales.T("gui.host"), gw.hostEntry)
 	form.Append(locales.T("gui.port"), gw.portEntry)
 	form.Append(locales.T("gui.roots"), container.NewBorder(nil, nil, nil, gw.browseBtn, gw.rootsEntry))
-	form.Append(locales.T("gui.extra_roots"), container.NewBorder(nil, nil, nil, gw.extraBrowse, gw.extraEntry))
-	form.Append("", gw.extraRemote)
+	for _, item := range gw.access.formItems(container.NewBorder(nil, nil, nil, gw.extraBrowse, gw.extraEntry)) {
+		form.AppendItem(item)
+	}
 	form.Append(locales.T("gui.url"), gw.urlEntry)
 	form.Append(locales.T("gui.shell"), gw.shellSelect)
 	form.Append(locales.T("gui.lang"), gw.langSelect)
@@ -262,6 +264,7 @@ func runGUI(cfg *devconfig.Config) {
 		extraEntry:  extraEntry,
 		extraRemote: extraRemote,
 		extraBrowse: extraBrowse,
+		access:      newAccessSection(cfg, w, extraRemote),
 		urlEntry:    urlEntry,
 		shellSelect: shellSelect,
 		langSelect:  langSelect,
@@ -287,8 +290,10 @@ func runGUI(cfg *devconfig.Config) {
 			return
 		}
 		cfg.OutsideAccess.Roots = extraRoots
-		remote := extraRemote.Checked
-		cfg.OutsideAccess.Remote = &remote
+		if err := gw.access.apply(&cfg.OutsideAccess); err != nil {
+			dialog.ShowError(err, w)
+			return
+		}
 
 		cfg.Host = hostEntry.Text
 		fmt.Sscanf(portEntry.Text, "%d", &cfg.Port)
@@ -326,12 +331,15 @@ func runGUI(cfg *devconfig.Config) {
 	testBtn := widget.NewButtonWithIcon(locales.T("gui.test"), theme.MediaPlayIcon(), func() {
 		statusLabel.SetText(locales.T("gui.status_checking"))
 		info := fmt.Sprintf(
-			"Host: %s\nPort: %s\nRoots: %s\nExtra roots:\n%s\nExtra roots via tunnel: %v\nURL: %s\n\n%s: %s\n%s: %s",
+			"Host: %s\nPort: %s\nRoots: %s\nOutside access: %s\nVia tunnel: %v\nExtra roots:\n%s\nBuilt-in deny list: %v\nCustom deny entries:\n%s\nURL: %s\n\n%s: %s\n%s: %s",
 			hostEntry.Text,
 			portEntry.Text,
 			rootsEntry.Text,
-			extraEntry.Text,
+			gw.access.modeValue,
 			extraRemote.Checked,
+			extraEntry.Text,
+			gw.access.denyDefaults.Checked,
+			strings.Join(gw.access.deny.items, "\n"),
 			urlEntry.Text,
 			locales.T("gui.shell"),
 			shellSelect.Selected,
@@ -373,33 +381,13 @@ func saveGUIConfig(cfg *devconfig.Config) error {
 	}
 
 	configPath := filepath.Join(cfg.ConfigDir, "config.json")
-	configData := map[string]interface{}{
-		"host":          cfg.Host,
-		"port":          cfg.Port,
-		"allowedRoots":  cfg.AllowedRoots,
-		"publicBaseUrl": cfg.PublicBaseURL,
-		"stateDir":      devconfig.PortablePath(cfg.StateDir),
-		"worktreeRoot":  devconfig.PortablePath(cfg.WorktreeRoot),
-		"agentDir":      devconfig.PortablePath(cfg.AgentDir),
-		"toolMode":      cfg.ToolMode,
-		"toolNaming":    cfg.ToolNaming,
-		"shell":         cfg.Shell,
-		"lang":          cfg.Lang,
-		"widgets":       cfg.Widgets,
-		"skillsEnabled": cfg.SkillsEnabled,
-		"logLevel":      cfg.Logging.Level,
-		"logFormat":     cfg.Logging.Format,
+	existing, err := os.ReadFile(configPath)
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("read config.json: %w", err)
 	}
-	// Always written, with "remote" spelled out, so the tunnel setting is
-	// visible and editable in config.json.
-	outside := cfg.OutsideAccess
-	remote := outside.RemoteEnabled()
-	outside.Remote = &remote
-	configData["outsideAccess"] = outside
-
-	data, err := json.MarshalIndent(configData, "", "  ")
+	data, err := mergeGUIConfig(existing, cfg)
 	if err != nil {
-		return fmt.Errorf("marshal config: %w", err)
+		return err
 	}
 	if err := devconfig.WriteFileAtomic(configPath, data, 0600); err != nil {
 		return fmt.Errorf("write config.json: %w", err)

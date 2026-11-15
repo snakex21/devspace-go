@@ -74,6 +74,36 @@ type Registry struct {
 	// used after a restart stays correct.
 	lastUsedID string
 	touchedAt  map[string]time.Time
+
+	// policy lets full outside-access mode open workspaces outside
+	// AllowedRoots. nil keeps workspaces inside AllowedRoots.
+	policy *AccessPolicy
+}
+
+// SetAccessPolicy attaches the outside-access policy. Call before serving.
+func (r *Registry) SetAccessPolicy(policy *AccessPolicy) {
+	r.policy = policy
+}
+
+// allowRoot accepts a workspace root inside AllowedRoots, or, in full
+// outside-access mode for origin, any plain absolute local folder that no
+// deny rule covers.
+func (r *Registry) allowRoot(rootPath string, origin Origin) (string, error) {
+	root, err := AssertAllowedPath(rootPath, r.cfg.AllowedRoots)
+	if err == nil {
+		return root, nil
+	}
+	if !r.policy.FullAccess(origin) {
+		return "", err
+	}
+	if !filepath.IsAbs(rootPath) {
+		return "", fmt.Errorf("workspace path %s must be absolute", rootPath)
+	}
+	clean := filepath.Clean(rootPath)
+	if perr := r.policy.CheckWorkspaceRoot(clean, origin); perr != nil {
+		return "", perr
+	}
+	return clean, nil
 }
 
 const touchInterval = 30 * time.Second
@@ -88,8 +118,15 @@ func NewRegistry(cfg *config.Config, s *store.Store) *Registry {
 	}
 }
 
-// OpenWorkspace opens a local directory as a workspace.
+// OpenWorkspace opens a local directory as a workspace for a request whose
+// origin is unknown (treated as remote, the stricter side).
 func (r *Registry) OpenWorkspace(rootPath string, mode Mode, baseRef string) (*WorkspaceContext, error) {
+	return r.OpenWorkspaceAs(OriginRemote, rootPath, mode, baseRef)
+}
+
+// OpenWorkspaceAs opens a local directory as a workspace for a request
+// from origin.
+func (r *Registry) OpenWorkspaceAs(origin Origin, rootPath string, mode Mode, baseRef string) (*WorkspaceContext, error) {
 	if mode == "" {
 		mode = ModeCheckout
 	}
@@ -101,11 +138,11 @@ func (r *Registry) OpenWorkspace(rootPath string, mode Mode, baseRef string) (*W
 		return nil, fmt.Errorf("worktree mode not yet implemented in Go version")
 	}
 
-	return r.openCheckoutWorkspace(rootPath)
+	return r.openCheckoutWorkspace(rootPath, origin)
 }
 
-func (r *Registry) openCheckoutWorkspace(rootPath string) (*WorkspaceContext, error) {
-	root, err := AssertAllowedPath(rootPath, r.cfg.AllowedRoots)
+func (r *Registry) openCheckoutWorkspace(rootPath string, origin Origin) (*WorkspaceContext, error) {
+	root, err := r.allowRoot(rootPath, origin)
 	if err != nil {
 		return nil, fmt.Errorf("workspace root not allowed: %w", err)
 	}
@@ -165,7 +202,7 @@ func (r *Registry) openCheckoutWorkspace(rootPath string) (*WorkspaceContext, er
 // OpenDefaultWorkspace opens the first configured allowed root. This avoids
 // sending local absolute paths through remote MCP clients that may block them.
 func (r *Registry) OpenDefaultWorkspace() (*WorkspaceContext, error) {
-	return r.openCheckoutWorkspace(r.defaultRoot())
+	return r.openCheckoutWorkspace(r.defaultRoot(), OriginRemote)
 }
 
 func (r *Registry) defaultRoot() string {
@@ -178,11 +215,19 @@ func (r *Registry) defaultRoot() string {
 	return "."
 }
 
-// GetWorkspace retrieves a workspace by ID.
+// GetWorkspace retrieves a workspace by ID for a request whose origin is
+// unknown (treated as remote).
 func (r *Registry) GetWorkspace(id string) (*Workspace, error) {
+	return r.GetWorkspaceAs(id, OriginRemote)
+}
+
+// GetWorkspaceAs retrieves a workspace by ID for a request from origin. A
+// workspace outside AllowedRoots (opened in full mode) is only returned
+// while full mode applies to origin.
+func (r *Registry) GetWorkspaceAs(id string, origin Origin) (*Workspace, error) {
 	id = strings.TrimSpace(id)
 	if id == "" || strings.EqualFold(id, "default") || strings.EqualFold(id, "latest") || strings.EqualFold(id, "last") {
-		return r.GetDefaultWorkspace()
+		return r.getDefaultWorkspace(origin)
 	}
 
 	r.mu.RLock()
@@ -190,6 +235,9 @@ func (r *Registry) GetWorkspace(id string) (*Workspace, error) {
 	r.mu.RUnlock()
 
 	if ok {
+		if _, err := r.allowRoot(ws.Root, origin); err != nil {
+			return nil, fmt.Errorf("workspace root not allowed: %w", err)
+		}
 		r.markUsed(id)
 		return ws, nil
 	}
@@ -201,7 +249,7 @@ func (r *Registry) GetWorkspace(id string) (*Workspace, error) {
 			return nil, fmt.Errorf("unknown workspaceId: %s. Call open_workspace first", id)
 		}
 
-		root, err := AssertAllowedPath(session.Root, r.cfg.AllowedRoots)
+		root, err := r.allowRoot(session.Root, origin)
 		if err != nil {
 			return nil, fmt.Errorf("stored workspace root not allowed: %w", err)
 		}
@@ -243,15 +291,19 @@ func (r *Registry) markUsed(id string) {
 // GetDefaultWorkspace retrieves the latest workspace, or opens the default root
 // if no session exists yet.
 func (r *Registry) GetDefaultWorkspace() (*Workspace, error) {
+	return r.getDefaultWorkspace(OriginRemote)
+}
+
+func (r *Registry) getDefaultWorkspace(origin Origin) (*Workspace, error) {
 	r.mu.RLock()
 	lastUsed := r.lastUsedID
 	r.mu.RUnlock()
 	if lastUsed != "" {
-		return r.GetWorkspace(lastUsed)
+		return r.GetWorkspaceAs(lastUsed, origin)
 	}
 	if r.store != nil {
 		if session, err := r.store.GetLatestSession(); err == nil {
-			return r.GetWorkspace(session.ID)
+			return r.GetWorkspaceAs(session.ID, origin)
 		}
 	}
 

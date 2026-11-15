@@ -77,20 +77,53 @@ type ExtraRootConfig struct {
 	Access string `json:"access,omitempty"`
 }
 
+// Outside-access modes.
+const (
+	// AccessModeFull lets file tools, the shell working directory and
+	// open_workspace use any absolute local path, read-write.
+	AccessModeFull = "full"
+	// AccessModeRoots allows only the folders listed in Roots.
+	AccessModeRoots = "roots"
+	// AccessModeOff confines tools to the open workspace.
+	AccessModeOff = "off"
+)
+
 // OutsideAccessConfig controls access to folders outside the open workspace.
 type OutsideAccessConfig struct {
+	// Mode is "full" (default), "roots" or "off".
+	Mode  string            `json:"mode,omitempty"`
 	Roots []ExtraRootConfig `json:"roots,omitempty"`
 	// Remote also grants Roots to requests that arrive through the public
 	// tunnel. On unless explicitly set to false (GUI checkbox or
 	// config.json). The tunnel URL is temporary and has no authentication,
 	// so whoever knows it gets the same access as the local user.
 	Remote *bool `json:"remote,omitempty"`
-	// Deny lists extra folders or files that stay blocked inside Roots, on
-	// top of the built-in list of credential and system locations.
+	// Deny lists extra absolute folders or files that stay blocked, on top
+	// of the built-in list.
 	Deny []string `json:"deny,omitempty"`
+	// DenyDefaults keeps the built-in list of credential stores and Dev
+	// Space Go's own config/state blocked. On unless set to false.
+	DenyDefaults *bool `json:"denyDefaults,omitempty"`
 	// Audit writes every outside-workspace access to outside-access.log in
 	// the state directory. On unless explicitly set to false.
 	Audit *bool `json:"audit,omitempty"`
+}
+
+// AccessMode returns the effective mode. An unknown value falls back to
+// "off" (reported by Problems); an empty one is the default "full".
+func (o OutsideAccessConfig) AccessMode() string {
+	switch mode := strings.ToLower(strings.TrimSpace(o.Mode)); mode {
+	case "":
+		return AccessModeFull
+	case AccessModeFull, AccessModeRoots, AccessModeOff:
+		return mode
+	}
+	return AccessModeOff
+}
+
+// DenyDefaultsEnabled reports whether the built-in deny list applies.
+func (o OutsideAccessConfig) DenyDefaultsEnabled() bool {
+	return o.DenyDefaults == nil || *o.DenyDefaults
 }
 
 // RemoteEnabled reports whether extra roots are available through the tunnel.
@@ -386,6 +419,11 @@ func (c *Config) Problems() []string {
 		case !info.IsDir():
 			problems = append(problems, fmt.Sprintf("allowed root %s is not a directory", root))
 		}
+	}
+	switch strings.ToLower(strings.TrimSpace(c.OutsideAccess.Mode)) {
+	case "", AccessModeFull, AccessModeRoots, AccessModeOff:
+	default:
+		problems = append(problems, fmt.Sprintf("outsideAccess.mode %q is invalid (use %q, %q or %q); access outside the workspace is off", c.OutsideAccess.Mode, AccessModeFull, AccessModeRoots, AccessModeOff))
 	}
 	for _, root := range c.OutsideAccess.Roots {
 		switch strings.ToLower(strings.TrimSpace(root.Access)) {

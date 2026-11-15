@@ -157,6 +157,24 @@ func runDoctor() {
 	for _, problem := range problems {
 		fmt.Printf("[!] %s\n", problem)
 	}
+	switch policy.Mode() {
+	case config.AccessModeFull:
+		where := "locally and through the public tunnel"
+		if !cfg.OutsideAccess.RemoteEnabled() {
+			where = "locally only; tunnel requests stay confined to the workspace"
+		}
+		fmt.Printf("[!] Full disk access outside the workspace (outsideAccess.mode: full), %s\n", where)
+		if cfg.OutsideAccess.DenyDefaultsEnabled() {
+			fmt.Println("[ok] Built-in deny list active (SSH private keys, credential stores, browser passwords/cookies, gh tokens, Dev Space Go config/state)")
+		} else {
+			fmt.Println("[!] Built-in deny list disabled (outsideAccess.denyDefaults: false)")
+		}
+		for _, entry := range cfg.OutsideAccess.Deny {
+			fmt.Printf("[ok] Custom deny entry: %s\n", entry)
+		}
+	case config.AccessModeOff:
+		fmt.Println("[ok] Tools are confined to the workspace (outsideAccess.mode: off)")
+	}
 	for _, root := range policy.Roots(workspace.OriginLocal) {
 		access := "read-only"
 		if root.Writable {

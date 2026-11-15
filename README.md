@@ -84,7 +84,7 @@ Requires **Go 1.26+** (see `go.mod`) only if building from source.
 
 ## What AI Can Do
 
-Once connected, the AI can open one of your approved project folders as a workspace:
+Once connected, the AI opens a project folder as a workspace. By default it can also read and write anywhere else on your local drives (see `outsideAccess`):
 
 - **Read, write, and edit** files inside the workspace
 - **Create directories and move/rename files** safely inside the workspace
@@ -129,47 +129,62 @@ All config lives **in the same folder as the executable** (portable):
 
 No environment variables needed — everything is in the portable config file.
 
-### Folders outside the workspace (`outsideAccess`)
+### Access outside the project (`outsideAccess`)
 
-File tools (`read`, `ls`, `grep`, `glob`, `write`, `edit`, `mkdir`, `move` and
-the `bash` working directory) are confined to the open workspace. To let them
-also use a sibling repository, a shared library or a scratch folder, list it as
-an extra root (GUI: *Extra folders outside the workspace*, one `ro <path>` or
-`rw <path>` per line):
+By default (`"mode": "full"`) the AI is **not limited to the project folder**:
+file tools (`read`, `ls`, `grep`, `glob`, `write`, `edit`, `mkdir`, `move`),
+the `bash` working directory and `open_workspace` accept any absolute path on
+the computer's local drives, read-write, locally and through the tunnel.
+Relative paths still resolve against the open workspace.
 
 ```json
 "outsideAccess": {
-  "roots": [
-    { "path": "D:/code/shared-lib", "access": "read" },
-    { "path": "D:/scratch",         "access": "readwrite" }
-  ],
+  "mode": "full",
   "remote": true,
-  "deny": ["D:/code/shared-lib/private"],
+  "denyDefaults": true,
+  "deny": ["D:/private"],
   "audit": true
 }
 ```
 
 | Field | Default | Description |
 |---|---|---|
-| `roots[].access` | `read` | `read` (read, ls, grep, glob) or `readwrite` (also write, edit, mkdir, move, shell working directory) |
-| `remote` | `true` | Also grant the roots to requests that arrive through the public tunnel. Set `false` (or untick the GUI checkbox) to keep tunnel requests confined to the workspace. The tunnel has no authentication: whoever knows its temporary URL gets the same access |
-| `deny` | `[]` | Extra absolute paths that stay blocked inside the roots |
-| `audit` | `true` | Log every outside-workspace access (allowed or denied) to `.devspace-state/outside-access.log` |
+| `mode` | `full` | `full`: any local folder, read-write. `roots`: only the folders in `roots`. `off`: the project only |
+| `remote` | `true` | Grant the same access to requests through the public tunnel. `false` (or untick the GUI checkbox): tunnel requests stay inside the project. The tunnel has no authentication: whoever knows its temporary URL gets this access |
+| `denyDefaults` | `true` | Keep the built-in list of sensitive locations blocked (below). `false` turns it off |
+| `deny` | `[]` | Your own absolute paths that stay blocked. `[]` clears them |
+| `roots` | `[]` | `roots` mode only: `{ "path": "...", "access": "read" \| "readwrite" }` |
+| `audit` | `true` | Log every access outside the project (allowed or denied) to `.devspace-state/outside-access.log` (paths only, never contents) |
 
-The AI addresses these folders with absolute paths. Paths are canonicalised by
-the OS before the check (symlinks, junctions, subst drives, 8.3 names, case);
-UNC, `\\?\`/`\\.\` device paths, NTFS streams and reserved names are refused.
-Credential and browser-profile locations (`.ssh`, `.gnupg`, `.aws`, `.git/config`,
-`.git-credentials`, SSH keys, Windows Credential Manager/DPAPI folders, browser
-profiles, Dev Space Go's own config and state) are always blocked inside the
-roots. System folders (`C:\Windows`, `Program Files`, `/etc`, ...) are blocked
-unless you configure a root inside them. A whole drive (`C:\`, `/`) is not
-accepted as a root. `devspace doctor` lists the active roots and any ignored
-entries.
+Everything is also editable in the GUI: the mode, the tunnel checkbox, the
+`roots` list (`ro <path>` / `rw <path>` lines), the built-in list toggle and
+the list of your own blocked paths (add, remove, browse). Saving from the GUI
+keeps every other value you wrote into `config.json` by hand.
+
+**Built-in deny list in `full` mode** (`denyDefaults`), applied everywhere,
+including inside the workspace:
+
+- SSH private keys: `id_rsa`, `id_ed25519`, `id_ecdsa`, `id_dsa` (`.pub` stays readable)
+- Windows Credential Manager, Vault and DPAPI keys: `%APPDATA%\Microsoft\Credentials`, `Protect`, `Vault`, `%LOCALAPPDATA%\Microsoft\Credentials`, `Vault` (macOS: `~/Library/Keychains`)
+- Browser passwords and cookies: `Login Data`, `Cookies`, `logins.json`, `key4.db`, `cookies.sqlite`
+- `.git-credentials` and the GitHub CLI token (`gh/hosts.yml`)
+- Dev Space Go's own config and state, so the AI cannot rewrite its own permissions
+
+`.env`, `.npmrc`, system folders and everything else stay accessible. In
+`roots` mode the list is broader (also `.aws`, `.gnupg`, `.kube`, `.docker`,
+`.git/config`, `.npmrc`, browser profiles, and system folders unless a root is
+configured inside them).
+
+Path hygiene applies in every mode: paths are canonicalised by the OS
+(symlinks, junctions, subst drives, 8.3 names, case) before any check, and UNC
+(`\\server\share`, which would leak the Windows login hash), `\\?\` / `\\.\`
+device paths, NTFS streams (`file:stream`), reserved names (`CON`, `NUL`, ...)
+and drive-relative paths (`C:foo`) are refused. The workspace root and its
+parents cannot be moved. `devspace doctor` shows the active mode and lists.
 
 pnpm on Windows: `node_modules` entries are junctions into the pnpm store
-outside the project. File tools no longer follow junctions out of the
-workspace, so add the store (`pnpm store path`) as a `read` root.
+outside the project. In `full` mode they just work; in `roots` mode add the
+store (`pnpm store path`) as a `read` root.
 
 ---
 
@@ -231,7 +246,7 @@ Set `"shell"` in config.json or choose in the GUI.
 ## Security
 
 - **No built-in authentication** — anyone with the public tunnel URL can use the server
-- **Path containment** — every tool path (read, write, edit, mkdir, move, ls, grep, glob and the shell working directory) is resolved inside the workspace root; `..`, absolute paths elsewhere and symlinks/junctions pointing outside are rejected. Folders configured in `outsideAccess` are the only exception; they are also reachable through the tunnel unless `outsideAccess.remote` is `false` (see above)
+- **Path containment** — every tool path (read, write, edit, mkdir, move, ls, grep, glob and the shell working directory) is resolved inside the workspace root; `..`, absolute paths elsewhere and symlinks/junctions pointing outside are rejected. This applies to `outsideAccess.mode: off`. The default `full` mode deliberately allows absolute paths anywhere on the local drives (locally and through the tunnel) except the built-in deny list; `roots` allows only the listed folders (see above)
 - **The shell tool is not a sandbox** — `bash` runs arbitrary commands with your user's permissions; path containment only applies to the file tools
 - **Tunnel access** — treat the public tunnel URL as a secret and stop the server when it is not in use
 - **No third-party uploads** — your code never leaves your machine

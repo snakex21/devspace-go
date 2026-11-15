@@ -75,6 +75,7 @@ func New(cfg *config.Config) (*Server, error) {
 
 	registry := workspace.NewRegistry(cfg, s)
 	policy, problems := workspace.NewAccessPolicy(cfg)
+	registry.SetAccessPolicy(policy)
 	for _, problem := range problems {
 		log.Warn().Msg(problem)
 	}
@@ -178,7 +179,11 @@ func (s *Server) start(ctx context.Context, startTunnel tunnelStarter) error {
 
 	log.Info().Str("address", listener.Addr().String()).Msg(locales.T("server.listening"))
 	log.Info().Strs("allowed_roots", s.cfg.AllowedRoots).Msg(locales.T("server.roots"))
-	if roots := s.policy.Roots(workspace.OriginLocal); len(roots) > 0 {
+	if s.policy.FullAccess(workspace.OriginLocal) {
+		log.Info().Bool("remote", s.policy.FullAccess(workspace.OriginRemote)).
+			Strs("denied", s.policy.DeniedPaths()).
+			Msg("full disk access outside the workspace is enabled")
+	} else if roots := s.policy.Roots(workspace.OriginLocal); len(roots) > 0 {
 		log.Info().Strs("extra_roots", describeRoots(roots)).
 			Bool("remote", len(s.policy.Roots(workspace.OriginRemote)) > 0).
 			Msg("extra roots outside the workspace are enabled")
@@ -274,7 +279,7 @@ func (s *Server) registerTools(server *mcp.Server, origin workspace.Origin) {
 				mode = workspace.ModeWorktree
 			}
 
-			wsCtx, err := s.registry.OpenWorkspace(input.Path, mode, input.BaseRef)
+			wsCtx, err := s.registry.OpenWorkspaceAs(origin, input.Path, mode, input.BaseRef)
 			if err != nil {
 				result := &mcp.CallToolResult{}
 				result.SetError(fmt.Errorf("failed to open workspace: %v", err))
@@ -368,7 +373,7 @@ func (s *Server) registerTools(server *mcp.Server, origin workspace.Origin) {
 			Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
 		},
 		func(ctx context.Context, req *mcp.CallToolRequest, input tools.ReadInput) (*mcp.CallToolResult, tools.ReadOutput, error) {
-			ws, err := s.registry.GetWorkspace(input.WorkspaceID)
+			ws, err := s.registry.GetWorkspaceAs(input.WorkspaceID, origin)
 			if err != nil {
 				result := &mcp.CallToolResult{}
 				result.SetError(err)
@@ -392,7 +397,7 @@ func (s *Server) registerTools(server *mcp.Server, origin workspace.Origin) {
 			},
 		},
 		func(ctx context.Context, req *mcp.CallToolRequest, input tools.WriteInput) (*mcp.CallToolResult, tools.WriteOutput, error) {
-			ws, err := s.registry.GetWorkspace(input.WorkspaceID)
+			ws, err := s.registry.GetWorkspaceAs(input.WorkspaceID, origin)
 			if err != nil {
 				result := &mcp.CallToolResult{}
 				result.SetError(err)
@@ -416,7 +421,7 @@ func (s *Server) registerTools(server *mcp.Server, origin workspace.Origin) {
 			},
 		},
 		func(ctx context.Context, req *mcp.CallToolRequest, input tools.MkdirInput) (*mcp.CallToolResult, tools.MkdirOutput, error) {
-			ws, err := s.registry.GetWorkspace(input.WorkspaceID)
+			ws, err := s.registry.GetWorkspaceAs(input.WorkspaceID, origin)
 			if err != nil {
 				result := &mcp.CallToolResult{}
 				result.SetError(err)
@@ -440,7 +445,7 @@ func (s *Server) registerTools(server *mcp.Server, origin workspace.Origin) {
 			},
 		},
 		func(ctx context.Context, req *mcp.CallToolRequest, input tools.MoveInput) (*mcp.CallToolResult, tools.MoveOutput, error) {
-			ws, err := s.registry.GetWorkspace(input.WorkspaceID)
+			ws, err := s.registry.GetWorkspaceAs(input.WorkspaceID, origin)
 			if err != nil {
 				result := &mcp.CallToolResult{}
 				result.SetError(err)
@@ -462,7 +467,7 @@ func (s *Server) registerTools(server *mcp.Server, origin workspace.Origin) {
 			},
 		},
 		func(ctx context.Context, req *mcp.CallToolRequest, input tools.EditInput) (*mcp.CallToolResult, tools.EditOutput, error) {
-			ws, err := s.registry.GetWorkspace(input.WorkspaceID)
+			ws, err := s.registry.GetWorkspaceAs(input.WorkspaceID, origin)
 			if err != nil {
 				result := &mcp.CallToolResult{}
 				result.SetError(err)
@@ -483,7 +488,7 @@ func (s *Server) registerTools(server *mcp.Server, origin workspace.Origin) {
 				Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
 			},
 			func(ctx context.Context, req *mcp.CallToolRequest, input tools.GrepInput) (*mcp.CallToolResult, tools.GrepOutput, error) {
-				ws, err := s.registry.GetWorkspace(input.WorkspaceID)
+				ws, err := s.registry.GetWorkspaceAs(input.WorkspaceID, origin)
 				if err != nil {
 					result := &mcp.CallToolResult{}
 					result.SetError(err)
@@ -501,7 +506,7 @@ func (s *Server) registerTools(server *mcp.Server, origin workspace.Origin) {
 				Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
 			},
 			func(ctx context.Context, req *mcp.CallToolRequest, input tools.GlobInput) (*mcp.CallToolResult, tools.GlobOutput, error) {
-				ws, err := s.registry.GetWorkspace(input.WorkspaceID)
+				ws, err := s.registry.GetWorkspaceAs(input.WorkspaceID, origin)
 				if err != nil {
 					result := &mcp.CallToolResult{}
 					result.SetError(err)
@@ -519,7 +524,7 @@ func (s *Server) registerTools(server *mcp.Server, origin workspace.Origin) {
 				Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
 			},
 			func(ctx context.Context, req *mcp.CallToolRequest, input tools.LsInput) (*mcp.CallToolResult, tools.LsOutput, error) {
-				ws, err := s.registry.GetWorkspace(input.WorkspaceID)
+				ws, err := s.registry.GetWorkspaceAs(input.WorkspaceID, origin)
 				if err != nil {
 					result := &mcp.CallToolResult{}
 					result.SetError(err)
@@ -552,7 +557,7 @@ func (s *Server) registerTools(server *mcp.Server, origin workspace.Origin) {
 			},
 		},
 		func(ctx context.Context, req *mcp.CallToolRequest, input tools.BashInput) (*mcp.CallToolResult, tools.BashOutput, error) {
-			ws, err := s.registry.GetWorkspace(input.WorkspaceID)
+			ws, err := s.registry.GetWorkspaceAs(input.WorkspaceID, origin)
 			if err != nil {
 				result := &mcp.CallToolResult{}
 				result.SetError(err)
@@ -616,7 +621,9 @@ func (s *Server) serverInstructions(origin workspace.Origin) string {
 	agentsMd := "Follow instructions returned by open_workspace. Before working under a path listed in availableAgentsFiles, use read to inspect that instruction file and follow it. "
 
 	extra := ""
-	if roots := s.policy.Roots(origin); len(roots) > 0 {
+	if s.policy.FullAccess(origin) {
+		extra = " Full disk access is enabled: besides the open workspace, file tools (read, ls, grep, glob, write, edit, mkdir, move) and the shell workingDirectory accept absolute paths anywhere on this machine's local drives, read-write, and open_workspace accepts any local folder. Relative paths still resolve against the workspace; paths outside it are shown absolute. Use plain drive paths (C:\\... or /...); UNC and device paths are refused, and a few credential stores (SSH private keys, Windows Credential Manager, browser password databases, GitHub CLI tokens) and Dev Space Go's own configuration stay blocked."
+	} else if roots := s.policy.Roots(origin); len(roots) > 0 {
 		extra = fmt.Sprintf(" Besides the open workspace, file tools also accept absolute paths inside these folders: %s. Paths there are always shown absolute; credential and system locations inside them stay blocked.", strings.Join(describeRoots(roots), "; "))
 	}
 

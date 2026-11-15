@@ -47,13 +47,17 @@ func resolveToolPath(ctx context.Context, wsRoot, inputPath string, op workspace
 	return absPath, outside, nil
 }
 
-// walkFilter returns a predicate hiding denied entries while walking an
-// extra root, or nil inside the workspace.
+// walkFilter returns a predicate hiding denied entries while walking (an
+// extra root, or anywhere in full mode), or nil when nothing is denied.
 func walkFilter(ctx context.Context, outside bool) func(path string) bool {
-	if !outside {
+	guard := guardFrom(ctx)
+	if guard == nil {
+		if outside {
+			return func(string) bool { return true }
+		}
 		return nil
 	}
-	return guardFrom(ctx).Hidden
+	return guard.WalkFilter(outside)
 }
 
 func errorResult(err error) *mcp.CallToolResult {

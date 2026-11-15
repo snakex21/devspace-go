@@ -166,46 +166,62 @@ Quick Tunnels służą do testów i nie mają gwarancji dostępności.
 
 ---
 
-### Foldery poza workspace (`outsideAccess`)
+### Dostęp poza projekt (`outsideAccess`)
 
-Narzędzia plikowe (`read`, `ls`, `grep`, `glob`, `write`, `edit`, `mkdir`, `move`
-oraz katalog roboczy `bash`) działają w otwartym workspace. Aby mogły używać też
-sąsiedniego repozytorium, wspólnej biblioteki czy folderu roboczego, dodaj go jako
-dodatkowy folder (GUI: *Dodatkowe foldery poza workspace*, jedna linia
-`ro <ścieżka>` albo `rw <ścieżka>`):
+Domyślnie (`"mode": "full"`) AI **nie jest ograniczone do folderu projektu**:
+narzędzia plikowe (`read`, `ls`, `grep`, `glob`, `write`, `edit`, `mkdir`, `move`),
+katalog roboczy `bash` i `open_workspace` przyjmują dowolną ścieżkę bezwzględną
+na lokalnych dyskach komputera, z odczytem i zapisem, lokalnie i przez tunel.
+Ścieżki względne nadal liczą się od otwartego workspace.
 
 ```json
 "outsideAccess": {
-  "roots": [
-    { "path": "D:/code/wspolna-biblioteka", "access": "read" },
-    { "path": "D:/brudnopis",                "access": "readwrite" }
-  ],
+  "mode": "full",
   "remote": true,
-  "deny": ["D:/code/wspolna-biblioteka/prywatne"],
+  "denyDefaults": true,
+  "deny": ["D:/prywatne"],
   "audit": true
 }
 ```
 
 | Pole | Domyślnie | Opis |
 |---|---|---|
-| `roots[].access` | `read` | `read` (read, ls, grep, glob) albo `readwrite` (także write, edit, mkdir, move, katalog roboczy powłoki) |
-| `remote` | `true` | Foldery działają także przez publiczny tunel. `false` (lub odznaczony checkbox w GUI) ogranicza żądania z tunelu do workspace. Tunel nie ma uwierzytelniania: kto zna jego tymczasowy adres, ma ten sam dostęp |
-| `deny` | `[]` | Dodatkowe ścieżki bezwzględne zablokowane wewnątrz folderów |
-| `audit` | `true` | Każdy dostęp poza workspace (dozwolony i odrzucony) trafia do `.devspace-state/outside-access.log` |
+| `mode` | `full` | `full`: dowolny lokalny folder, odczyt i zapis. `roots`: tylko foldery z `roots`. `off`: tylko projekt |
+| `remote` | `true` | Ten sam dostęp dla żądań przez publiczny tunel. `false` (lub odznaczony checkbox w GUI): żądania z tunelu zostają w projekcie. Tunel nie ma uwierzytelniania: kto zna jego tymczasowy adres, ma ten dostęp |
+| `denyDefaults` | `true` | Wbudowana lista wrażliwych miejsc (niżej) pozostaje zablokowana. `false` ją wyłącza |
+| `deny` | `[]` | Twoje własne ścieżki bezwzględne do zablokowania. `[]` czyści listę |
+| `roots` | `[]` | Tylko tryb `roots`: `{ "path": "...", "access": "read" \| "readwrite" }` |
+| `audit` | `true` | Każdy dostęp poza projekt (dozwolony i odrzucony) trafia do `.devspace-state/outside-access.log` (tylko ścieżki, nigdy treść) |
 
-AI podaje te foldery ścieżkami bezwzględnymi. Przed sprawdzeniem system
-kanonikalizuje ścieżkę (symlinki, junction, dyski subst, nazwy 8.3, wielkość liter);
-ścieżki UNC, `\\?\`/`\\.\`, strumienie NTFS i nazwy zarezerwowane są odrzucane.
-Dane logowania i profile przeglądarek (`.ssh`, `.gnupg`, `.aws`, `.git/config`,
-`.git-credentials`, klucze SSH, Menedżer poświadczeń/DPAPI, profile przeglądarek,
-konfiguracja i stan Dev Space Go) są zawsze zablokowane. Foldery systemowe
-(`C:\Windows`, `Program Files`, `/etc`, ...) są zablokowane, chyba że skonfigurujesz
-folder wewnątrz nich. Cały dysk (`C:\`, `/`) nie jest akceptowany.
-`devspace doctor` pokazuje aktywne foldery i zignorowane wpisy.
+Wszystko można też zmienić w GUI: tryb, checkbox tunelu, listę `roots`
+(linie `ro <ścieżka>` / `rw <ścieżka>`), przełącznik listy wbudowanej i listę
+własnych zablokowanych ścieżek (dodaj, usuń, przeglądaj). Zapis z GUI zachowuje
+wszystkie inne wartości wpisane ręcznie w `config.json`.
 
-Uwaga dla pnpm na Windows: `node_modules` to junction do magazynu pnpm poza
-projektem. Narzędzia plikowe nie wychodzą już przez junction, więc dodaj magazyn
-pnpm (`pnpm store path`) jako folder `read`.
+**Wbudowana lista w trybie `full`** (`denyDefaults`), obowiązuje wszędzie,
+także wewnątrz workspace:
+
+- Prywatne klucze SSH: `id_rsa`, `id_ed25519`, `id_ecdsa`, `id_dsa` (`.pub` pozostaje czytelny)
+- Menedżer poświadczeń Windows, Vault i klucze DPAPI: `%APPDATA%\Microsoft\Credentials`, `Protect`, `Vault`, `%LOCALAPPDATA%\Microsoft\Credentials`, `Vault` (macOS: `~/Library/Keychains`)
+- Hasła i ciasteczka przeglądarek: `Login Data`, `Cookies`, `logins.json`, `key4.db`, `cookies.sqlite`
+- `.git-credentials` i token GitHub CLI (`gh/hosts.yml`)
+- Własna konfiguracja i stan Dev Space Go, żeby AI nie mogło zmienić sobie uprawnień
+
+`.env`, `.npmrc`, foldery systemowe i cała reszta pozostają dostępne. W trybie
+`roots` lista jest szersza (także `.aws`, `.gnupg`, `.kube`, `.docker`,
+`.git/config`, `.npmrc`, profile przeglądarek oraz foldery systemowe, chyba że
+skonfigurujesz folder wewnątrz nich).
+
+Higiena ścieżek działa w każdym trybie: przed sprawdzeniem system kanonikalizuje
+ścieżkę (symlinki, junction, dyski subst, nazwy 8.3, wielkość liter), a ścieżki
+UNC (`\\serwer\udział`, które ujawniłyby hash logowania Windows), `\\?\` / `\\.\`,
+strumienie NTFS (`plik:strumień`), nazwy zarezerwowane (`CON`, `NUL`, ...) i ścieżki
+względne względem dysku (`C:foo`) są odrzucane. Workspace i jego folderów
+nadrzędnych nie da się przenieść. `devspace doctor` pokazuje aktywny tryb i listy.
+
+pnpm na Windows: `node_modules` to junction do magazynu pnpm poza projektem.
+W trybie `full` po prostu działa; w trybie `roots` dodaj magazyn
+(`pnpm store path`) jako folder `read`.
 
 ## Obsługa powłoki
 
@@ -222,7 +238,7 @@ Ustaw `"shell"` w config.json lub wybierz w GUI.
 ## Bezpieczeństwo
 
 - **Brak wbudowanego uwierzytelniania** — każdy, kto zna publiczny adres tunelu, może używać serwera
-- **Ograniczenie ścieżek** — każda ścieżka narzędzia (read, write, edit, mkdir, move, ls, grep, glob i katalog roboczy powłoki) jest rozwiązywana wewnątrz workspace; `..`, ścieżki bezwzględne gdzie indziej oraz symlinki/junction prowadzące na zewnątrz są odrzucane. Jedynym wyjątkiem są foldery z `outsideAccess`, dostępne także przez tunel, chyba że `outsideAccess.remote` to `false`
+- **Ograniczenie ścieżek** — każda ścieżka narzędzia (read, write, edit, mkdir, move, ls, grep, glob i katalog roboczy powłoki) jest rozwiązywana wewnątrz workspace; `..`, ścieżki bezwzględne gdzie indziej oraz symlinki/junction prowadzące na zewnątrz są odrzucane. Tak działa `outsideAccess.mode: off`. Domyślny tryb `full` celowo pozwala na ścieżki bezwzględne na wszystkich lokalnych dyskach (lokalnie i przez tunel) poza wbudowaną listą; `roots` pozwala tylko na wybrane foldery (patrz wyżej)
 - **Dostęp przez tunel** — traktuj publiczny adres jak sekret i wyłączaj serwer, gdy go nie używasz
 - **Brak wysyłania do stron trzecich** — Twój kod nigdy nie opuszcza Twojego komputera
 

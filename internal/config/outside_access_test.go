@@ -62,3 +62,28 @@ func TestOutsideAccessRemoteDefaultsOnWithRootsAndCanBeDisabled(t *testing.T) {
 		}
 	}
 }
+
+func TestOutsideAccessModeAndDenyDefaults(t *testing.T) {
+	for data, want := range map[string]struct {
+		mode         string
+		denyDefaults bool
+		denyLen      int
+	}{
+		`{"port":7676}`:                                                {AccessModeFull, true, 0},
+		`{"outsideAccess":{"mode":"roots"}}`:                           {AccessModeRoots, true, 0},
+		`{"outsideAccess":{"mode":"OFF"}}`:                             {AccessModeOff, true, 0},
+		`{"outsideAccess":{"mode":"bogus"}}`:                           {AccessModeOff, true, 0},
+		`{"outsideAccess":{"denyDefaults":false,"deny":[]}}`:           {AccessModeFull, false, 0},
+		`{"outsideAccess":{"mode":"full","deny":["/srv/a","/srv/b"]}}`: {AccessModeFull, true, 2},
+	} {
+		configDir := t.TempDir()
+		if err := os.WriteFile(filepath.Join(configDir, "config.json"), []byte(data), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		t.Setenv("DEVSPACE_CONFIG_DIR", configDir)
+		access := LoadConfig().OutsideAccess
+		if access.AccessMode() != want.mode || access.DenyDefaultsEnabled() != want.denyDefaults || len(access.Deny) != want.denyLen {
+			t.Errorf("%s: mode %q denyDefaults %v deny %v", data, access.AccessMode(), access.DenyDefaultsEnabled(), access.Deny)
+		}
+	}
+}

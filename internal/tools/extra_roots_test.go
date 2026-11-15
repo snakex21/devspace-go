@@ -45,6 +45,7 @@ func extraRootFixture(t *testing.T, origin workspace.Origin, remote bool) (ctx c
 		t.Fatal(err)
 	}
 	cfg.OutsideAccess = config.OutsideAccessConfig{
+		Mode: config.AccessModeRoots,
 		Roots: []config.ExtraRootConfig{
 			{Path: shared, Access: "read"},
 			{Path: rw, Access: "readwrite"},

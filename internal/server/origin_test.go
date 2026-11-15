@@ -85,6 +85,7 @@ func TestMCPExtraRootsLocalVersusTunnel(t *testing.T) {
 		cfg.StateDir = filepath.Join(parent, "state")
 		cfg.ConfigDir = filepath.Join(parent, "config")
 		cfg.OutsideAccess = config.OutsideAccessConfig{
+			Mode:   config.AccessModeRoots,
 			Roots:  []config.ExtraRootConfig{{Path: shared, Access: "read"}},
 			Remote: setting,
 		}

@@ -76,6 +76,7 @@ func newAccessFixture(t *testing.T) *accessFixture {
 			t.Fatal(err)
 		}
 	}
+	cfg.OutsideAccess.Mode = config.AccessModeRoots
 	cfg.OutsideAccess.Roots = []config.ExtraRootConfig{
 		{Path: f.shared, Access: "read"},
 		{Path: f.rw, Access: "readwrite"},
