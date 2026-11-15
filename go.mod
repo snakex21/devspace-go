@@ -1,13 +1,13 @@
 module github.com/snakex21/devspace-go
 
-go 1.26.2
+go 1.26.11
 
 require (
 	fyne.io/fyne/v2 v2.7.4
 	github.com/google/uuid v1.6.0
 	github.com/modelcontextprotocol/go-sdk v1.6.1
 	github.com/rs/zerolog v1.35.1
-	golang.org/x/sys v0.42.0
+	golang.org/x/sys v0.50.0
 	modernc.org/sqlite v1.52.0
 )
 
@@ -50,10 +50,10 @@ require (
 	github.com/stretchr/testify v1.11.1 // indirect
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
 	github.com/yuin/goldmark v1.7.8 // indirect
-	golang.org/x/image v0.24.0 // indirect
-	golang.org/x/net v0.35.0 // indirect
+	golang.org/x/image v0.48.0 // indirect
+	golang.org/x/net v0.62.0 // indirect
 	golang.org/x/oauth2 v0.35.0 // indirect
-	golang.org/x/text v0.22.0 // indirect
+	golang.org/x/text v0.44.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	modernc.org/libc v1.72.3 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
