@@ -129,6 +129,44 @@ All config lives **in the same folder as the executable** (portable):
 
 No environment variables needed — everything is in the portable config file.
 
+### Folders outside the workspace (`outsideAccess`)
+
+File tools (`read`, `ls`, `grep`, `glob`, `write`, `edit`, `mkdir`, `move` and
+the `bash` working directory) are confined to the open workspace. To let them
+also use a sibling repository, a shared library or a scratch folder, list it as
+an extra root (GUI: *Extra folders outside the workspace*, one `ro <path>` or
+`rw <path>` per line):
+
+```json
+"outsideAccess": {
+  "roots": [
+    { "path": "D:/code/shared-lib", "access": "read" },
+    { "path": "D:/scratch",         "access": "readwrite" }
+  ],
+  "remote": false,
+  "deny": ["D:/code/shared-lib/private"],
+  "audit": true
+}
+```
+
+| Field | Default | Description |
+|---|---|---|
+| `roots[].access` | `read` | `read` (read, ls, grep, glob) or `readwrite` (also write, edit, mkdir, move, shell working directory) |
+| `remote` | `false` | Also grant the roots to requests that arrive through the public tunnel. Off: tunnel requests stay confined to the workspace |
+| `deny` | `[]` | Extra absolute paths that stay blocked inside the roots |
+| `audit` | `true` | Log every outside-workspace access (allowed or denied) to `.devspace-state/outside-access.log` |
+
+The AI addresses these folders with absolute paths. Paths are canonicalised by
+the OS before the check (symlinks, junctions, subst drives, 8.3 names, case);
+UNC, `\\?\`/`\\.\` device paths, NTFS streams and reserved names are refused.
+Credential and browser-profile locations (`.ssh`, `.gnupg`, `.aws`, `.git/config`,
+`.git-credentials`, SSH keys, Windows Credential Manager/DPAPI folders, browser
+profiles, Dev Space Go's own config and state) are always blocked inside the
+roots. System folders (`C:\Windows`, `Program Files`, `/etc`, ...) are blocked
+unless you configure a root inside them. A whole drive (`C:\`, `/`) is not
+accepted as a root. `devspace doctor` lists the active roots and any ignored
+entries.
+
 ---
 
 ## Tunnel (Remote Access)
@@ -189,7 +227,7 @@ Set `"shell"` in config.json or choose in the GUI.
 ## Security
 
 - **No built-in authentication** — anyone with the public tunnel URL can use the server
-- **Path containment** — every tool path (read, write, edit, mkdir, move, ls, grep, glob and the shell working directory) is resolved inside the workspace root; `..`, absolute paths elsewhere and symlinks/junctions pointing outside are rejected
+- **Path containment** — every tool path (read, write, edit, mkdir, move, ls, grep, glob and the shell working directory) is resolved inside the workspace root; `..`, absolute paths elsewhere and symlinks/junctions pointing outside are rejected. Folders configured in `outsideAccess` are the only exception, local-only by default (see above)
 - **The shell tool is not a sandbox** — `bash` runs arbitrary commands with your user's permissions; path containment only applies to the file tools
 - **Tunnel access** — treat the public tunnel URL as a secret and stop the server when it is not in use
 - **No third-party uploads** — your code never leaves your machine

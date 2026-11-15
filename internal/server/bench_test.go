@@ -19,7 +19,7 @@ func BenchmarkCreateMcpServer(b *testing.B) {
 	s := &Server{cfg: cfg, registry: workspace.NewRegistry(cfg, nil)}
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		s.createMcpServer()
+		s.createMcpServer(workspace.OriginLocal)
 	}
 }
 

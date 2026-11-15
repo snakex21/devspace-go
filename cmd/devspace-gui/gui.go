@@ -67,6 +67,9 @@ type guiWidgets struct {
 	hostEntry   *widget.Entry
 	portEntry   *widget.Entry
 	rootsEntry  *widget.Entry
+	extraEntry  *widget.Entry
+	extraRemote *widget.Check
+	extraBrowse *widget.Button
 	urlEntry    *widget.Entry
 	shellSelect *widget.Select
 	langSelect  *widget.Select
@@ -97,6 +100,9 @@ func (gw *guiWidgets) applyLang() {
 
 	// Update placeholders
 	gw.rootsEntry.SetPlaceHolder(locales.T("gui.roots_placeholder"))
+	gw.extraEntry.SetPlaceHolder(locales.T("gui.extra_roots_placeholder"))
+	gw.extraRemote.SetText(locales.T("gui.extra_roots_remote"))
+	gw.extraBrowse.SetText(locales.T("gui.browse"))
 	gw.urlEntry.SetPlaceHolder(locales.T("gui.url_placeholder"))
 	gw.portEntry.Validator = func(s string) error {
 		var p int
@@ -115,6 +121,8 @@ func (gw *guiWidgets) rebuildForm() {
 	form.Append(locales.T("gui.host"), gw.hostEntry)
 	form.Append(locales.T("gui.port"), gw.portEntry)
 	form.Append(locales.T("gui.roots"), container.NewBorder(nil, nil, nil, gw.browseBtn, gw.rootsEntry))
+	form.Append(locales.T("gui.extra_roots"), container.NewBorder(nil, nil, nil, gw.extraBrowse, gw.extraEntry))
+	form.Append("", gw.extraRemote)
 	form.Append(locales.T("gui.url"), gw.urlEntry)
 	form.Append(locales.T("gui.shell"), gw.shellSelect)
 	form.Append(locales.T("gui.lang"), gw.langSelect)
@@ -193,6 +201,34 @@ func runGUI(cfg *devconfig.Config) {
 		folderDialog.Show()
 	})
 
+	// Extra roots: folders outside the workspace, one per line as
+	// "ro <path>" or "rw <path>".
+	extraEntry := widget.NewMultiLineEntry()
+	extraEntry.SetMinRowsVisible(3)
+	extraEntry.SetText(formatExtraRoots(cfg.OutsideAccess.Roots))
+	extraEntry.SetPlaceHolder(locales.T("gui.extra_roots_placeholder"))
+	extraRemote := widget.NewCheck(locales.T("gui.extra_roots_remote"), nil)
+	extraRemote.SetChecked(cfg.OutsideAccess.Remote)
+	extraBrowse := widget.NewButtonWithIcon(locales.T("gui.browse"), theme.FolderOpenIcon(), func() {
+		folderDialog := dialog.NewFolderOpen(func(uri fyne.ListableURI, err error) {
+			if err != nil || uri == nil {
+				return
+			}
+			path := strings.TrimPrefix(uri.Path(), "file://")
+			if len(path) >= 3 && path[0] == '/' && path[2] == ':' {
+				path = path[1:]
+			}
+			// New folders start read-only; the user edits "ro" to "rw".
+			current := strings.TrimRight(extraEntry.Text, "\r\n")
+			if current != "" {
+				current += "\n"
+			}
+			extraEntry.SetText(current + "ro " + filepath.FromSlash(path))
+		}, w)
+		folderDialog.Resize(folderDialogSize(w.Canvas().Size()))
+		folderDialog.Show()
+	})
+
 	urlEntry := widget.NewEntry()
 	urlEntry.SetText(cfg.PublicBaseURL)
 	urlEntry.SetPlaceHolder(locales.T("gui.url_placeholder"))
@@ -223,6 +259,9 @@ func runGUI(cfg *devconfig.Config) {
 		hostEntry:   hostEntry,
 		portEntry:   portEntry,
 		rootsEntry:  rootsEntry,
+		extraEntry:  extraEntry,
+		extraRemote: extraRemote,
+		extraBrowse: extraBrowse,
 		urlEntry:    urlEntry,
 		shellSelect: shellSelect,
 		langSelect:  langSelect,
@@ -242,6 +281,13 @@ func runGUI(cfg *devconfig.Config) {
 			dialog.ShowError(err, w)
 			return
 		}
+		extraRoots, err := parseExtraRoots(extraEntry.Text)
+		if err != nil {
+			dialog.ShowError(fmt.Errorf("%s: %v", locales.T("gui.extra_roots_invalid"), err), w)
+			return
+		}
+		cfg.OutsideAccess.Roots = extraRoots
+		cfg.OutsideAccess.Remote = extraRemote.Checked
 
 		cfg.Host = hostEntry.Text
 		fmt.Sscanf(portEntry.Text, "%d", &cfg.Port)
@@ -279,10 +325,12 @@ func runGUI(cfg *devconfig.Config) {
 	testBtn := widget.NewButtonWithIcon(locales.T("gui.test"), theme.MediaPlayIcon(), func() {
 		statusLabel.SetText(locales.T("gui.status_checking"))
 		info := fmt.Sprintf(
-			"Host: %s\nPort: %s\nRoots: %s\nURL: %s\n\n%s: %s\n%s: %s",
+			"Host: %s\nPort: %s\nRoots: %s\nExtra roots:\n%s\nExtra roots via tunnel: %v\nURL: %s\n\n%s: %s\n%s: %s",
 			hostEntry.Text,
 			portEntry.Text,
 			rootsEntry.Text,
+			extraEntry.Text,
+			extraRemote.Checked,
 			urlEntry.Text,
 			locales.T("gui.shell"),
 			shellSelect.Selected,
@@ -341,6 +389,9 @@ func saveGUIConfig(cfg *devconfig.Config) error {
 		"logLevel":      cfg.Logging.Level,
 		"logFormat":     cfg.Logging.Format,
 	}
+	if len(cfg.OutsideAccess.Roots) > 0 || len(cfg.OutsideAccess.Deny) > 0 || cfg.OutsideAccess.Remote || cfg.OutsideAccess.Audit != nil {
+		configData["outsideAccess"] = cfg.OutsideAccess
+	}
 
 	data, err := json.MarshalIndent(configData, "", "  ")
 	if err != nil {
@@ -351,4 +402,45 @@ func saveGUIConfig(cfg *devconfig.Config) error {
 	}
 
 	return nil
+}
+
+// formatExtraRoots renders extra roots for the GUI, one per line.
+func formatExtraRoots(roots []devconfig.ExtraRootConfig) string {
+	lines := make([]string, 0, len(roots))
+	for _, root := range roots {
+		prefix := "ro"
+		if strings.EqualFold(strings.TrimSpace(root.Access), devconfig.AccessReadWrite) {
+			prefix = "rw"
+		}
+		lines = append(lines, prefix+" "+root.Path)
+	}
+	return strings.Join(lines, "\n")
+}
+
+// parseExtraRoots reads "ro <path>" / "rw <path>" lines. A line without a
+// prefix is read-only. Paths must be absolute; their existence is checked
+// when the server starts (devspace doctor reports problems).
+func parseExtraRoots(text string) ([]devconfig.ExtraRootConfig, error) {
+	var roots []devconfig.ExtraRootConfig
+	for _, line := range strings.Split(strings.ReplaceAll(text, "\r\n", "\n"), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		access := devconfig.AccessRead
+		if fields := strings.Fields(line); len(fields) > 1 {
+			switch strings.ToLower(fields[0]) {
+			case "ro", "read":
+				line = strings.TrimSpace(line[len(fields[0]):])
+			case "rw", "readwrite":
+				access = devconfig.AccessReadWrite
+				line = strings.TrimSpace(line[len(fields[0]):])
+			}
+		}
+		if !filepath.IsAbs(line) {
+			return nil, fmt.Errorf("%q is not an absolute path", line)
+		}
+		roots = append(roots, devconfig.ExtraRootConfig{Path: line, Access: access})
+	}
+	return roots, nil
 }

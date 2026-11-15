@@ -22,15 +22,38 @@ import (
 	"github.com/snakex21/devspace-go/internal/workspace"
 )
 
+type guardKey struct{}
+
+// WithGuard attaches the request's access guard to ctx. Without one, tools
+// are confined to the workspace root (the safe default).
+func WithGuard(ctx context.Context, guard *workspace.Guard) context.Context {
+	return context.WithValue(ctx, guardKey{}, guard)
+}
+
+func guardFrom(ctx context.Context) *workspace.Guard {
+	guard, _ := ctx.Value(guardKey{}).(*workspace.Guard)
+	return guard
+}
+
 // resolveToolPath maps a tool path argument to an absolute path inside the
-// workspace. Every tool must use it instead of joining paths itself, so that
-// "..", absolute paths and links cannot escape the workspace root.
-func resolveToolPath(wsRoot, inputPath string) (string, *mcp.CallToolResult) {
-	absPath, err := workspace.ResolveInRoot(wsRoot, inputPath)
+// workspace, or inside an extra root the request's guard grants for op.
+// Every tool must use it instead of joining paths itself, so that "..",
+// absolute paths and links cannot escape. outside reports an extra-root path.
+func resolveToolPath(ctx context.Context, wsRoot, inputPath string, op workspace.Op) (absPath string, outside bool, failure *mcp.CallToolResult) {
+	absPath, outside, err := guardFrom(ctx).Resolve(wsRoot, inputPath, op)
 	if err != nil {
-		return "", errorResult(err)
+		return "", false, errorResult(err)
 	}
-	return absPath, nil
+	return absPath, outside, nil
+}
+
+// walkFilter returns a predicate hiding denied entries while walking an
+// extra root, or nil inside the workspace.
+func walkFilter(ctx context.Context, outside bool) func(path string) bool {
+	if !outside {
+		return nil
+	}
+	return guardFrom(ctx).Hidden
 }
 
 func errorResult(err error) *mcp.CallToolResult {
@@ -95,7 +118,7 @@ type ReadOutput struct {
 
 // ReadFile reads a file and returns its content.
 func ReadFile(ctx context.Context, req *mcp.CallToolRequest, input ReadInput, wsRoot string) (*mcp.CallToolResult, ReadOutput, error) {
-	absPath, failure := resolveToolPath(wsRoot, input.Path)
+	absPath, _, failure := resolveToolPath(ctx, wsRoot, input.Path, workspace.OpRead)
 	if failure != nil {
 		return failure, ReadOutput{}, nil
 	}
@@ -238,7 +261,7 @@ type MoveOutput struct {
 
 // WriteFile creates or overwrites a file.
 func WriteFile(ctx context.Context, req *mcp.CallToolRequest, input WriteInput, wsRoot string) (*mcp.CallToolResult, WriteOutput, error) {
-	absPath, failure := resolveToolPath(wsRoot, input.Path)
+	absPath, _, failure := resolveToolPath(ctx, wsRoot, input.Path, workspace.OpWrite)
 	if failure != nil {
 		return failure, WriteOutput{}, nil
 	}
@@ -266,7 +289,7 @@ func WriteFile(ctx context.Context, req *mcp.CallToolRequest, input WriteInput, 
 
 // MakeDirectory creates a directory and all missing parents inside a workspace.
 func MakeDirectory(ctx context.Context, req *mcp.CallToolRequest, input MkdirInput, wsRoot string) (*mcp.CallToolResult, MkdirOutput, error) {
-	absPath, failure := resolveToolPath(wsRoot, input.Path)
+	absPath, _, failure := resolveToolPath(ctx, wsRoot, input.Path, workspace.OpWrite)
 	if failure != nil {
 		return failure, MkdirOutput{}, nil
 	}
@@ -285,11 +308,11 @@ func MakeDirectory(ctx context.Context, req *mcp.CallToolRequest, input MkdirInp
 
 // MovePath moves or renames a file/directory inside a workspace.
 func MovePath(ctx context.Context, req *mcp.CallToolRequest, input MoveInput, wsRoot string) (*mcp.CallToolResult, MoveOutput, error) {
-	sourceAbs, failure := resolveToolPath(wsRoot, input.SourcePath)
+	sourceAbs, _, failure := resolveToolPath(ctx, wsRoot, input.SourcePath, workspace.OpMove)
 	if failure != nil {
 		return failure, MoveOutput{}, nil
 	}
-	targetAbs, failure := resolveToolPath(wsRoot, input.TargetPath)
+	targetAbs, _, failure := resolveToolPath(ctx, wsRoot, input.TargetPath, workspace.OpMove)
 	if failure != nil {
 		return failure, MoveOutput{}, nil
 	}
@@ -369,7 +392,7 @@ type EditOutput struct {
 
 // EditFile performs find-and-replace edits on a file.
 func EditFile(ctx context.Context, req *mcp.CallToolRequest, input EditInput, wsRoot string) (*mcp.CallToolResult, EditOutput, error) {
-	absPath, failure := resolveToolPath(wsRoot, input.Path)
+	absPath, _, failure := resolveToolPath(ctx, wsRoot, input.Path, workspace.OpWrite)
 	if failure != nil {
 		return failure, EditOutput{}, nil
 	}
@@ -441,10 +464,11 @@ type GrepOutput struct {
 
 // GrepFiles searches file contents for a pattern.
 func GrepFiles(ctx context.Context, req *mcp.CallToolRequest, input GrepInput, wsRoot string) (*mcp.CallToolResult, GrepOutput, error) {
-	searchPath, failure := resolveToolPath(wsRoot, input.Path)
+	searchPath, outside, failure := resolveToolPath(ctx, wsRoot, input.Path, workspace.OpRead)
 	if failure != nil {
 		return failure, GrepOutput{}, nil
 	}
+	hidden := walkFilter(ctx, outside)
 
 	re, err := regexp.Compile(input.Pattern)
 	if err != nil {
@@ -472,6 +496,12 @@ func GrepFiles(ctx context.Context, req *mcp.CallToolRequest, input GrepInput, w
 		}
 		if time.Since(start) > 20*time.Second || matches >= maxSearchMatches {
 			return filepath.SkipAll
+		}
+		if hidden != nil && hidden(path) {
+			if entry.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
 		}
 		if entry.IsDir() {
 			if shouldSkipToolDirectory(path, searchPath, entry.Name(), runtime.GOOS) {
@@ -513,8 +543,7 @@ func GrepFiles(ctx context.Context, req *mcp.CallToolRequest, input GrepInput, w
 			line := scanner.Bytes()
 			if re.Match(line) {
 				if rel == "" {
-					rel, _ = filepath.Rel(wsRoot, path)
-					rel = filepath.ToSlash(rel)
+					rel = workspace.FormatPath(path, wsRoot)
 				}
 				lines = append(lines, rel+":"+strconv.Itoa(lineNo)+":"+string(line))
 				matches++
@@ -558,10 +587,11 @@ type GlobOutput struct {
 
 // FindFiles finds files matching a glob pattern.
 func FindFiles(ctx context.Context, req *mcp.CallToolRequest, input GlobInput, wsRoot string) (*mcp.CallToolResult, GlobOutput, error) {
-	searchPath, failure := resolveToolPath(wsRoot, input.Path)
+	searchPath, outside, failure := resolveToolPath(ctx, wsRoot, input.Path, workspace.OpRead)
 	if failure != nil {
 		return failure, GlobOutput{}, nil
 	}
+	hidden := walkFilter(ctx, outside)
 
 	var matches []string
 
@@ -571,6 +601,12 @@ func FindFiles(ctx context.Context, req *mcp.CallToolRequest, input GlobInput, w
 		}
 		if ctx.Err() != nil || len(matches) >= maxSearchMatches {
 			return filepath.SkipAll
+		}
+		if hidden != nil && hidden(path) {
+			if entry.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
 		}
 		if entry.IsDir() {
 			if shouldSkipToolDirectory(path, searchPath, entry.Name(), runtime.GOOS) {
@@ -586,8 +622,7 @@ func FindFiles(ctx context.Context, req *mcp.CallToolRequest, input GlobInput, w
 		if err != nil || info.Size() > maxSearchFileBytes {
 			return nil
 		}
-		rel, _ := filepath.Rel(wsRoot, path)
-		matches = append(matches, filepath.ToSlash(rel))
+		matches = append(matches, workspace.FormatPath(path, wsRoot))
 		return nil
 	})
 
@@ -619,10 +654,11 @@ type LsOutput struct {
 
 // ListDirectory lists the contents of a directory.
 func ListDirectory(ctx context.Context, req *mcp.CallToolRequest, input LsInput, wsRoot string) (*mcp.CallToolResult, LsOutput, error) {
-	absPath, failure := resolveToolPath(wsRoot, input.Path)
+	absPath, outside, failure := resolveToolPath(ctx, wsRoot, input.Path, workspace.OpRead)
 	if failure != nil {
 		return failure, LsOutput{}, nil
 	}
+	hidden := walkFilter(ctx, outside)
 
 	entries, err := os.ReadDir(absPath)
 	if err != nil {
@@ -633,6 +669,9 @@ func ListDirectory(ctx context.Context, req *mcp.CallToolRequest, input LsInput,
 
 	var lines []string
 	for _, entry := range entries {
+		if hidden != nil && hidden(filepath.Join(absPath, entry.Name())) {
+			continue
+		}
 		info, err := entry.Info()
 		if err != nil {
 			lines = append(lines, entry.Name())
@@ -682,7 +721,7 @@ type BashOutput struct {
 
 // RunBash executes a shell command. Uses PowerShell on Windows, bash on Unix.
 func RunBash(ctx context.Context, req *mcp.CallToolRequest, input BashInput, wsRoot string) (*mcp.CallToolResult, BashOutput, error) {
-	cwd, failure := resolveToolPath(wsRoot, input.WorkingDirectory)
+	cwd, _, failure := resolveToolPath(ctx, wsRoot, input.WorkingDirectory, workspace.OpExec)
 	if failure != nil {
 		return failure, BashOutput{}, nil
 	}

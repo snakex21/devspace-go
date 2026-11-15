@@ -35,21 +35,32 @@ type Server struct {
 	started  bool
 	registry *workspace.Registry
 	store    *store.Store
+	// policy grants file tools access to extra roots outside the workspace.
+	// nil confines every tool to the workspace root.
+	policy *workspace.AccessPolicy
 	// tunnelBackoff overrides defaultTunnelBackoff (tests only).
 	tunnelBackoff backoffPolicy
 
-	mcpOnce   sync.Once
-	mcpShared *mcp.Server
+	mcpLocalOnce, mcpRemoteOnce sync.Once
+	mcpLocal, mcpRemote         *mcp.Server
 }
 
-// mcpServer returns the MCP server shared by all HTTP requests and SSE
-// sessions. Building one registers every tool and infers its JSON schemas
-// (about 1.3 ms and 15k allocations), which used to happen on every
-// stateless /mcp request. The SDK explicitly supports serving many sessions
-// from one server; the configuration it depends on never changes after New.
-func (s *Server) mcpServer() *mcp.Server {
-	s.mcpOnce.Do(func() { s.mcpShared = s.createMcpServer() })
-	return s.mcpShared
+// mcpServerFor returns the MCP server shared by all HTTP requests and SSE
+// sessions from one origin. Building one registers every tool and infers its
+// JSON schemas (about 1.3 ms and 15k allocations), which used to happen on
+// every stateless /mcp request. The SDK explicitly supports serving many
+// sessions from one server; the configuration it depends on never changes
+// after New. Local and tunnel requests get separate servers because their
+// access to extra roots (and the instructions describing it) differ; the
+// origin is fixed per server so an SSE session keeps the origin of the
+// request that opened it.
+func (s *Server) mcpServerFor(r *http.Request) *mcp.Server {
+	if requestOrigin(r, s.cfg.Host) == workspace.OriginLocal {
+		s.mcpLocalOnce.Do(func() { s.mcpLocal = s.createMcpServer(workspace.OriginLocal) })
+		return s.mcpLocal
+	}
+	s.mcpRemoteOnce.Do(func() { s.mcpRemote = s.createMcpServer(workspace.OriginRemote) })
+	return s.mcpRemote
 }
 
 // New creates a new Dev Space Go server.
@@ -63,11 +74,16 @@ func New(cfg *config.Config) (*Server, error) {
 	}
 
 	registry := workspace.NewRegistry(cfg, s)
+	policy, problems := workspace.NewAccessPolicy(cfg)
+	for _, problem := range problems {
+		log.Warn().Msg(problem)
+	}
 
 	return &Server{
 		cfg:      cfg,
 		registry: registry,
 		store:    s,
+		policy:   policy,
 	}, nil
 }
 
@@ -128,9 +144,7 @@ func (s *Server) start(ctx context.Context, startTunnel tunnelStarter) error {
 
 	// Legacy SSE endpoint for MCP clients that still expect /sse.
 	sseHandler := mcp.NewSSEHandler(
-		func(r *http.Request) *mcp.Server {
-			return s.mcpServer()
-		},
+		s.mcpServerFor,
 		&mcp.SSEOptions{DisableLocalhostProtection: true},
 	)
 	mux.Handle("/sse", limitRequestBody(sseHandler))
@@ -164,6 +178,11 @@ func (s *Server) start(ctx context.Context, startTunnel tunnelStarter) error {
 
 	log.Info().Str("address", listener.Addr().String()).Msg(locales.T("server.listening"))
 	log.Info().Strs("allowed_roots", s.cfg.AllowedRoots).Msg(locales.T("server.roots"))
+	if roots := s.policy.Roots(workspace.OriginLocal); len(roots) > 0 {
+		log.Info().Strs("extra_roots", describeRoots(roots)).
+			Bool("remote", len(s.policy.Roots(workspace.OriginRemote)) > 0).
+			Msg("extra roots outside the workspace are enabled")
+	}
 	log.Info().Bool("skills", s.cfg.SkillsEnabled).
 		Str("tool_mode", string(s.cfg.ToolMode)).Str("tool_naming", string(s.cfg.ToolNaming)).
 		Msg(locales.T("server.config"))
@@ -210,9 +229,7 @@ func tunnelOrigin(address string) string {
 
 func (s *Server) streamableMCPHandler() http.Handler {
 	return mcp.NewStreamableHTTPHandler(
-		func(r *http.Request) *mcp.Server {
-			return s.mcpServer()
-		},
+		s.mcpServerFor,
 		&mcp.StreamableHTTPOptions{
 			Stateless:                  true,
 			JSONResponse:               true,
@@ -221,22 +238,28 @@ func (s *Server) streamableMCPHandler() http.Handler {
 	)
 }
 
-// createMcpServer creates a new MCP server with all tools registered.
-func (s *Server) createMcpServer() *mcp.Server {
+// createMcpServer creates a new MCP server with all tools registered for
+// requests from origin.
+func (s *Server) createMcpServer(origin workspace.Origin) *mcp.Server {
 	mcpServer := mcp.NewServer(
 		&mcp.Implementation{Name: "devspace-go", Version: Version},
 		&mcp.ServerOptions{
-			Instructions: s.serverInstructions(),
+			Instructions: s.serverInstructions(origin),
 		},
 	)
 
-	s.registerTools(mcpServer)
+	s.registerTools(mcpServer, origin)
 	return mcpServer
 }
 
 // registerTools registers all Dev Space Go tools on the MCP server.
-func (s *Server) registerTools(server *mcp.Server) {
+func (s *Server) registerTools(server *mcp.Server, origin workspace.Origin) {
 	names := s.toolNames()
+	// guarded attaches the access guard for this origin and tool, so file
+	// tools can reach extra roots the policy grants.
+	guarded := func(ctx context.Context, tool string) context.Context {
+		return tools.WithGuard(ctx, s.policy.Guard(origin, tool))
+	}
 
 	// open_workspace
 	addTool(server,
@@ -352,7 +375,7 @@ func (s *Server) registerTools(server *mcp.Server) {
 				return result, tools.ReadOutput{}, nil
 			}
 
-			return tools.ReadFile(ctx, req, input, ws.Root)
+			return tools.ReadFile(guarded(ctx, names.Read), req, input, ws.Root)
 		},
 	)
 
@@ -376,7 +399,7 @@ func (s *Server) registerTools(server *mcp.Server) {
 				return result, tools.WriteOutput{}, nil
 			}
 
-			return tools.WriteFile(ctx, req, input, ws.Root)
+			return tools.WriteFile(guarded(ctx, names.Write), req, input, ws.Root)
 		},
 	)
 
@@ -400,7 +423,7 @@ func (s *Server) registerTools(server *mcp.Server) {
 				return result, tools.MkdirOutput{}, nil
 			}
 
-			return tools.MakeDirectory(ctx, req, input, ws.Root)
+			return tools.MakeDirectory(guarded(ctx, names.Mkdir), req, input, ws.Root)
 		},
 	)
 
@@ -424,7 +447,7 @@ func (s *Server) registerTools(server *mcp.Server) {
 				return result, tools.MoveOutput{}, nil
 			}
 
-			return tools.MovePath(ctx, req, input, ws.Root)
+			return tools.MovePath(guarded(ctx, names.Move), req, input, ws.Root)
 		},
 	)
 
@@ -446,7 +469,7 @@ func (s *Server) registerTools(server *mcp.Server) {
 				return result, tools.EditOutput{}, nil
 			}
 
-			return tools.EditFile(ctx, req, input, ws.Root)
+			return tools.EditFile(guarded(ctx, names.Edit), req, input, ws.Root)
 		},
 	)
 
@@ -466,7 +489,7 @@ func (s *Server) registerTools(server *mcp.Server) {
 					result.SetError(err)
 					return result, tools.GrepOutput{}, nil
 				}
-				return tools.GrepFiles(ctx, req, input, ws.Root)
+				return tools.GrepFiles(guarded(ctx, names.Grep), req, input, ws.Root)
 			},
 		)
 
@@ -484,7 +507,7 @@ func (s *Server) registerTools(server *mcp.Server) {
 					result.SetError(err)
 					return result, tools.GlobOutput{}, nil
 				}
-				return tools.FindFiles(ctx, req, input, ws.Root)
+				return tools.FindFiles(guarded(ctx, names.Glob), req, input, ws.Root)
 			},
 		)
 
@@ -502,7 +525,7 @@ func (s *Server) registerTools(server *mcp.Server) {
 					result.SetError(err)
 					return result, tools.LsOutput{}, nil
 				}
-				return tools.ListDirectory(ctx, req, input, ws.Root)
+				return tools.ListDirectory(guarded(ctx, names.Ls), req, input, ws.Root)
 			},
 		)
 	}
@@ -535,7 +558,7 @@ func (s *Server) registerTools(server *mcp.Server) {
 				result.SetError(err)
 				return result, tools.BashOutput{}, nil
 			}
-			return tools.RunBash(ctx, req, input, ws.Root)
+			return tools.RunBash(guarded(ctx, names.Bash), req, input, ws.Root)
 		},
 	)
 }
@@ -580,7 +603,7 @@ func (s *Server) toolNames() ToolNames {
 	}
 }
 
-func (s *Server) serverInstructions() string {
+func (s *Server) serverInstructions(origin workspace.Origin) string {
 	names := s.toolNames()
 
 	inspection := fmt.Sprintf("Prefer %s, %s, %s, and %s for file inspection. ",
@@ -592,11 +615,16 @@ func (s *Server) serverInstructions() string {
 
 	agentsMd := "Follow instructions returned by open_workspace. Before working under a path listed in availableAgentsFiles, use read to inspect that instruction file and follow it. "
 
+	extra := ""
+	if roots := s.policy.Roots(origin); len(roots) > 0 {
+		extra = fmt.Sprintf(" Besides the open workspace, file tools also accept absolute paths inside these folders: %s. Paths there are always shown absolute; credential and system locations inside them stay blocked.", strings.Join(describeRoots(roots), "; "))
+	}
+
 	return fmt.Sprintf(
-		"Use Dev Space Go as a local coding workspace. Call open_workspace once per project folder or worktree to obtain a workspaceId; if local absolute paths are blocked by the client, call open_default_workspace instead. Reuse that same workspaceId for all later file, search, edit, write, mkdir, move, and shell tools in that folder. If the workspaceId becomes stale after reconnecting, pass workspaceId 'default' or 'latest' to use the most recent/default workspace. %s%sPrefer %s for targeted modifications, %s only for new files or complete rewrites, %s for directory creation, %s for moves/renames, and %s for tests, builds, git inspection, package scripts, and commands that are better executed by the shell. Do not create, move, rename, or modify files with %s. On Windows, %s uses PowerShell.exe; on Unix, bash.",
+		"Use Dev Space Go as a local coding workspace. Call open_workspace once per project folder or worktree to obtain a workspaceId; if local absolute paths are blocked by the client, call open_default_workspace instead. Reuse that same workspaceId for all later file, search, edit, write, mkdir, move, and shell tools in that folder. If the workspaceId becomes stale after reconnecting, pass workspaceId 'default' or 'latest' to use the most recent/default workspace. %s%sPrefer %s for targeted modifications, %s only for new files or complete rewrites, %s for directory creation, %s for moves/renames, and %s for tests, builds, git inspection, package scripts, and commands that are better executed by the shell. Do not create, move, rename, or modify files with %s. On Windows, %s uses PowerShell.exe; on Unix, bash.%s",
 		agentsMd,
 		inspection,
-		names.Edit, names.Write, names.Mkdir, names.Move, names.Bash, names.Bash, names.Bash,
+		names.Edit, names.Write, names.Mkdir, names.Move, names.Bash, names.Bash, names.Bash, extra,
 	)
 }
 
@@ -620,6 +648,18 @@ func (s *Server) loggingMiddleware(next http.Handler) http.Handler {
 			Dur("duration_ms", time.Since(start)).
 			Msg("http_request")
 	})
+}
+
+func describeRoots(roots []workspace.RootInfo) []string {
+	described := make([]string, 0, len(roots))
+	for _, root := range roots {
+		access := "read-only"
+		if root.Writable {
+			access = "read-write"
+		}
+		described = append(described, fmt.Sprintf("%s (%s)", root.Path, access))
+	}
+	return described
 }
 
 // --- types ---

@@ -64,6 +64,38 @@ type LoggingConfig struct {
 	TrustProxy    bool      `json:"trustProxy"`
 }
 
+// Access levels of an extra root.
+const (
+	AccessRead      = "read"
+	AccessReadWrite = "readwrite"
+)
+
+// ExtraRootConfig is one folder outside the workspace that file tools may use.
+type ExtraRootConfig struct {
+	Path string `json:"path"`
+	// Access is "read" (default) or "readwrite".
+	Access string `json:"access,omitempty"`
+}
+
+// OutsideAccessConfig controls access to folders outside the open workspace.
+type OutsideAccessConfig struct {
+	Roots []ExtraRootConfig `json:"roots,omitempty"`
+	// Remote also grants Roots to requests that arrive through the public
+	// tunnel. Off by default: a tunnel URL has no authentication.
+	Remote bool `json:"remote,omitempty"`
+	// Deny lists extra folders or files that stay blocked inside Roots, on
+	// top of the built-in list of credential and system locations.
+	Deny []string `json:"deny,omitempty"`
+	// Audit writes every outside-workspace access to outside-access.log in
+	// the state directory. On unless explicitly set to false.
+	Audit *bool `json:"audit,omitempty"`
+}
+
+// AuditEnabled reports whether outside-workspace accesses are logged.
+func (o OutsideAccessConfig) AuditEnabled() bool {
+	return o.Audit == nil || *o.Audit
+}
+
 // Config holds all Dev Space Go server configuration.
 type Config struct {
 	Host          string        `json:"host"`
@@ -83,6 +115,10 @@ type Config struct {
 	SkillPaths    []string      `json:"skillPaths"`
 	AllowedHosts  []string      `json:"allowedHosts"`
 	Logging       LoggingConfig `json:"logging"`
+
+	// OutsideAccess lets file tools reach selected folders outside the open
+	// workspace. Empty by default: tools stay confined to the workspace.
+	OutsideAccess OutsideAccessConfig `json:"outsideAccess"`
 
 	// Warnings lists problems found while loading (e.g. a malformed
 	// config.json that was ignored). It is never written to disk.
@@ -274,6 +310,9 @@ func LoadConfig() *Config {
 			if fileConfig.Logging.Format != "" {
 				cfg.Logging.Format = fileConfig.Logging.Format
 			}
+			if _, ok := raw["outsideAccess"]; ok {
+				cfg.OutsideAccess = fileConfig.OutsideAccess
+			}
 			if rawLogging, ok := raw["logging"]; ok {
 				var loggingRaw map[string]json.RawMessage
 				_ = json.Unmarshal(rawLogging, &loggingRaw)
@@ -339,6 +378,13 @@ func (c *Config) Problems() []string {
 			problems = append(problems, fmt.Sprintf("allowed root %s is not accessible: %v", root, err))
 		case !info.IsDir():
 			problems = append(problems, fmt.Sprintf("allowed root %s is not a directory", root))
+		}
+	}
+	for _, root := range c.OutsideAccess.Roots {
+		switch strings.ToLower(strings.TrimSpace(root.Access)) {
+		case "", AccessRead, AccessReadWrite:
+		default:
+			problems = append(problems, fmt.Sprintf("extra root %s: access %q is invalid (use %q or %q); the root is ignored", root.Path, root.Access, AccessRead, AccessReadWrite))
 		}
 	}
 	return problems

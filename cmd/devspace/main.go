@@ -10,6 +10,7 @@ import (
 	"github.com/snakex21/devspace-go/internal/config"
 	"github.com/snakex21/devspace-go/internal/locales"
 	"github.com/snakex21/devspace-go/internal/server"
+	"github.com/snakex21/devspace-go/internal/workspace"
 )
 
 func main() {
@@ -149,6 +150,26 @@ func runDoctor() {
 		fmt.Printf("[ok] Allowed roots: %s\n", strings.Join(cfg.AllowedRoots, ", "))
 	} else {
 		fmt.Println("[!] No allowed roots configured")
+	}
+
+	// Extra roots outside the workspace
+	policy, problems := workspace.NewAccessPolicy(cfg)
+	for _, problem := range problems {
+		fmt.Printf("[!] %s\n", problem)
+	}
+	for _, root := range policy.Roots(workspace.OriginLocal) {
+		access := "read-only"
+		if root.Writable {
+			access = "read-write"
+		}
+		fmt.Printf("[ok] Extra root (%s): %s\n", access, root.Path)
+	}
+	if len(policy.Roots(workspace.OriginLocal)) > 0 {
+		if cfg.OutsideAccess.Remote {
+			fmt.Println("[!] Extra roots are also available through the public tunnel (outsideAccess.remote)")
+		} else {
+			fmt.Println("[ok] Extra roots are local-only; tunnel requests stay confined to the workspace")
+		}
 	}
 
 	// Check shell availability
