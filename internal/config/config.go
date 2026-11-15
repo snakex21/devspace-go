@@ -81,14 +81,21 @@ type ExtraRootConfig struct {
 type OutsideAccessConfig struct {
 	Roots []ExtraRootConfig `json:"roots,omitempty"`
 	// Remote also grants Roots to requests that arrive through the public
-	// tunnel. Off by default: a tunnel URL has no authentication.
-	Remote bool `json:"remote,omitempty"`
+	// tunnel. On unless explicitly set to false (GUI checkbox or
+	// config.json). The tunnel URL is temporary and has no authentication,
+	// so whoever knows it gets the same access as the local user.
+	Remote *bool `json:"remote,omitempty"`
 	// Deny lists extra folders or files that stay blocked inside Roots, on
 	// top of the built-in list of credential and system locations.
 	Deny []string `json:"deny,omitempty"`
 	// Audit writes every outside-workspace access to outside-access.log in
 	// the state directory. On unless explicitly set to false.
 	Audit *bool `json:"audit,omitempty"`
+}
+
+// RemoteEnabled reports whether extra roots are available through the tunnel.
+func (o OutsideAccessConfig) RemoteEnabled() bool {
+	return o.Remote == nil || *o.Remote
 }
 
 // AuditEnabled reports whether outside-workspace accesses are logged.

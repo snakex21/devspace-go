@@ -85,7 +85,7 @@
     "gui.roots_parse_error": "nie udało się sparsować katalogów. Podaj ścieżki oddzielone średnikami",
     "gui.extra_roots": "Dodatkowe foldery poza workspace:",
     "gui.extra_roots_placeholder": "jeden na linię: ro D:\\wspolna-biblioteka   lub   rw D:\\brudnopis",
-    "gui.extra_roots_remote": "Zezwól na dodatkowe foldery także przez publiczny tunel (niezalecane)",
+    "gui.extra_roots_remote": "Zezwól na dodatkowe foldery także przez publiczny tunel (odznacz, by były tylko lokalne)",
     "gui.extra_roots_invalid": "nieprawidłowy dodatkowy folder",
     "gui.save_error": "nie udało się zapisać",
     "gui.configured": "Dev Space Go jest już skonfigurowany.",

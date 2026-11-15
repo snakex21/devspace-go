@@ -407,6 +407,20 @@ func TestGuardRemoteOrigin(t *testing.T) {
 	f := newAccessFixture(t)
 	lib := filepath.Join(f.shared, "lib.go")
 
+	// Default (remote not set): extra roots also work through the tunnel.
+	remote := f.guard(t, OriginRemote)
+	if got := f.policy(t).Roots(OriginRemote); len(got) != 3 {
+		t.Fatalf("remote roots by default: %v", got)
+	}
+	requireAllowed(t, remote, f.ws, lib, OpRead)
+	// Remote access lifts no other rule.
+	requireDenied(t, remote, f.ws, lib, OpWrite)
+	requireDenied(t, remote, f.ws, filepath.Join(f.shared, ".ssh", "id_rsa"), OpRead)
+	requireDenied(t, remote, f.ws, filepath.Join(f.outside, "secret.txt"), OpRead)
+
+	// Explicitly disabled: the tunnel stays confined to the workspace.
+	off := false
+	f.cfg.OutsideAccess.Remote = &off
 	policy := f.policy(t)
 	if len(policy.Roots(OriginRemote)) != 0 || len(policy.Roots(OriginLocal)) != 3 {
 		t.Fatalf("roots: local %v remote %v", policy.Roots(OriginLocal), policy.Roots(OriginRemote))
@@ -418,14 +432,7 @@ func TestGuardRemoteOrigin(t *testing.T) {
 	// Unknown origins are treated as remote.
 	requireDenied(t, policy.Guard(Origin("other"), "read"), f.ws, lib, OpRead)
 	requireAllowed(t, policy.Guard(OriginLocal, "read"), f.ws, lib, OpRead)
-
-	f.cfg.OutsideAccess.Remote = true
-	remote := f.guard(t, OriginRemote)
-	requireAllowed(t, remote, f.ws, lib, OpRead)
-	// Enabling remote access lifts no other rule.
-	requireDenied(t, remote, f.ws, lib, OpWrite)
-	requireDenied(t, remote, f.ws, filepath.Join(f.shared, ".ssh", "id_rsa"), OpRead)
-	requireDenied(t, remote, f.ws, filepath.Join(f.outside, "secret.txt"), OpRead)
+	requireAllowed(t, policy.Guard(OriginRemote, "read"), f.ws, "inside.txt", OpRead)
 }
 
 func TestGuardMoveCannotTouchRootsOrWorkspace(t *testing.T) {

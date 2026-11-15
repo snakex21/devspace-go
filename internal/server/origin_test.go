@@ -62,10 +62,13 @@ func TestRequestOriginIsLocalOnlyWithoutAnyTunnelSignal(t *testing.T) {
 
 // TestMCPExtraRootsLocalVersusTunnel drives the real /mcp handler: the same
 // read of an extra root works for a local client and is refused when the
-// request carries the headers a Cloudflare tunnel adds, unless remote access
-// to extra roots is enabled.
+// request carries the headers a Cloudflare tunnel adds only when remote
+// access to extra roots is explicitly disabled.
 func TestMCPExtraRootsLocalVersusTunnel(t *testing.T) {
-	for _, remoteEnabled := range []bool{false, true} {
+	off, on := false, true
+	// nil is the default: remote access to extra roots is on.
+	for _, setting := range []*bool{nil, &off, &on} {
+		remoteEnabled := setting == nil || *setting
 		parent := t.TempDir()
 		root := filepath.Join(parent, "ws")
 		shared := filepath.Join(parent, "shared")
@@ -83,7 +86,7 @@ func TestMCPExtraRootsLocalVersusTunnel(t *testing.T) {
 		cfg.ConfigDir = filepath.Join(parent, "config")
 		cfg.OutsideAccess = config.OutsideAccessConfig{
 			Roots:  []config.ExtraRootConfig{{Path: shared, Access: "read"}},
-			Remote: remoteEnabled,
+			Remote: setting,
 		}
 		policy, problems := workspace.NewAccessPolicy(cfg)
 		if len(problems) > 0 {

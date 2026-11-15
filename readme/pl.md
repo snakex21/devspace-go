@@ -166,6 +166,47 @@ Quick Tunnels służą do testów i nie mają gwarancji dostępności.
 
 ---
 
+### Foldery poza workspace (`outsideAccess`)
+
+Narzędzia plikowe (`read`, `ls`, `grep`, `glob`, `write`, `edit`, `mkdir`, `move`
+oraz katalog roboczy `bash`) działają w otwartym workspace. Aby mogły używać też
+sąsiedniego repozytorium, wspólnej biblioteki czy folderu roboczego, dodaj go jako
+dodatkowy folder (GUI: *Dodatkowe foldery poza workspace*, jedna linia
+`ro <ścieżka>` albo `rw <ścieżka>`):
+
+```json
+"outsideAccess": {
+  "roots": [
+    { "path": "D:/code/wspolna-biblioteka", "access": "read" },
+    { "path": "D:/brudnopis",                "access": "readwrite" }
+  ],
+  "remote": true,
+  "deny": ["D:/code/wspolna-biblioteka/prywatne"],
+  "audit": true
+}
+```
+
+| Pole | Domyślnie | Opis |
+|---|---|---|
+| `roots[].access` | `read` | `read` (read, ls, grep, glob) albo `readwrite` (także write, edit, mkdir, move, katalog roboczy powłoki) |
+| `remote` | `true` | Foldery działają także przez publiczny tunel. `false` (lub odznaczony checkbox w GUI) ogranicza żądania z tunelu do workspace. Tunel nie ma uwierzytelniania: kto zna jego tymczasowy adres, ma ten sam dostęp |
+| `deny` | `[]` | Dodatkowe ścieżki bezwzględne zablokowane wewnątrz folderów |
+| `audit` | `true` | Każdy dostęp poza workspace (dozwolony i odrzucony) trafia do `.devspace-state/outside-access.log` |
+
+AI podaje te foldery ścieżkami bezwzględnymi. Przed sprawdzeniem system
+kanonikalizuje ścieżkę (symlinki, junction, dyski subst, nazwy 8.3, wielkość liter);
+ścieżki UNC, `\\?\`/`\\.\`, strumienie NTFS i nazwy zarezerwowane są odrzucane.
+Dane logowania i profile przeglądarek (`.ssh`, `.gnupg`, `.aws`, `.git/config`,
+`.git-credentials`, klucze SSH, Menedżer poświadczeń/DPAPI, profile przeglądarek,
+konfiguracja i stan Dev Space Go) są zawsze zablokowane. Foldery systemowe
+(`C:\Windows`, `Program Files`, `/etc`, ...) są zablokowane, chyba że skonfigurujesz
+folder wewnątrz nich. Cały dysk (`C:\`, `/`) nie jest akceptowany.
+`devspace doctor` pokazuje aktywne foldery i zignorowane wpisy.
+
+Uwaga dla pnpm na Windows: `node_modules` to junction do magazynu pnpm poza
+projektem. Narzędzia plikowe nie wychodzą już przez junction, więc dodaj magazyn
+pnpm (`pnpm store path`) jako folder `read`.
+
 ## Obsługa powłoki
 
 | System | Domyślnie | Alternatywy |
@@ -181,7 +222,7 @@ Ustaw `"shell"` w config.json lub wybierz w GUI.
 ## Bezpieczeństwo
 
 - **Brak wbudowanego uwierzytelniania** — każdy, kto zna publiczny adres tunelu, może używać serwera
-- **Ograniczenie ścieżek** — wszystkie operacje na plikach są sprawdzane względem dozwolonych katalogów głównych
+- **Ograniczenie ścieżek** — każda ścieżka narzędzia (read, write, edit, mkdir, move, ls, grep, glob i katalog roboczy powłoki) jest rozwiązywana wewnątrz workspace; `..`, ścieżki bezwzględne gdzie indziej oraz symlinki/junction prowadzące na zewnątrz są odrzucane. Jedynym wyjątkiem są foldery z `outsideAccess`, dostępne także przez tunel, chyba że `outsideAccess.remote` to `false`
 - **Dostęp przez tunel** — traktuj publiczny adres jak sekret i wyłączaj serwer, gdy go nie używasz
 - **Brak wysyłania do stron trzecich** — Twój kod nigdy nie opuszcza Twojego komputera
 

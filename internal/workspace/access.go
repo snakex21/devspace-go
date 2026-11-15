@@ -95,7 +95,7 @@ func NewAccessPolicy(cfg *config.Config) (*AccessPolicy, []string) {
 }
 
 func newAccessPolicy(cfg *config.Config, loc locations) (*AccessPolicy, []string) {
-	policy := &AccessPolicy{allowRemote: cfg.OutsideAccess.Remote}
+	policy := &AccessPolicy{allowRemote: cfg.OutsideAccess.RemoteEnabled()}
 	var problems []string
 
 	policy.deny = builtinDenyRules(loc)

@@ -208,7 +208,7 @@ func runGUI(cfg *devconfig.Config) {
 	extraEntry.SetText(formatExtraRoots(cfg.OutsideAccess.Roots))
 	extraEntry.SetPlaceHolder(locales.T("gui.extra_roots_placeholder"))
 	extraRemote := widget.NewCheck(locales.T("gui.extra_roots_remote"), nil)
-	extraRemote.SetChecked(cfg.OutsideAccess.Remote)
+	extraRemote.SetChecked(cfg.OutsideAccess.RemoteEnabled())
 	extraBrowse := widget.NewButtonWithIcon(locales.T("gui.browse"), theme.FolderOpenIcon(), func() {
 		folderDialog := dialog.NewFolderOpen(func(uri fyne.ListableURI, err error) {
 			if err != nil || uri == nil {
@@ -287,7 +287,8 @@ func runGUI(cfg *devconfig.Config) {
 			return
 		}
 		cfg.OutsideAccess.Roots = extraRoots
-		cfg.OutsideAccess.Remote = extraRemote.Checked
+		remote := extraRemote.Checked
+		cfg.OutsideAccess.Remote = &remote
 
 		cfg.Host = hostEntry.Text
 		fmt.Sscanf(portEntry.Text, "%d", &cfg.Port)
@@ -389,9 +390,12 @@ func saveGUIConfig(cfg *devconfig.Config) error {
 		"logLevel":      cfg.Logging.Level,
 		"logFormat":     cfg.Logging.Format,
 	}
-	if len(cfg.OutsideAccess.Roots) > 0 || len(cfg.OutsideAccess.Deny) > 0 || cfg.OutsideAccess.Remote || cfg.OutsideAccess.Audit != nil {
-		configData["outsideAccess"] = cfg.OutsideAccess
-	}
+	// Always written, with "remote" spelled out, so the tunnel setting is
+	// visible and editable in config.json.
+	outside := cfg.OutsideAccess
+	remote := outside.RemoteEnabled()
+	outside.Remote = &remote
+	configData["outsideAccess"] = outside
 
 	data, err := json.MarshalIndent(configData, "", "  ")
 	if err != nil {

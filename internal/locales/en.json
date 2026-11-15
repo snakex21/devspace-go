@@ -85,7 +85,7 @@
     "gui.roots_parse_error": "could not parse directories. Provide paths separated by semicolons",
     "gui.extra_roots": "Extra folders outside the workspace:",
     "gui.extra_roots_placeholder": "one per line: ro D:\\shared-lib   or   rw D:\\scratch",
-    "gui.extra_roots_remote": "Also allow extra folders through the public tunnel (not recommended)",
+    "gui.extra_roots_remote": "Allow extra folders through the public tunnel too (untick to keep them local-only)",
     "gui.extra_roots_invalid": "invalid extra folder",
     "gui.save_error": "save failed",
     "gui.configured": "Dev Space Go is already configured.",

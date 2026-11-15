@@ -165,8 +165,8 @@ func runDoctor() {
 		fmt.Printf("[ok] Extra root (%s): %s\n", access, root.Path)
 	}
 	if len(policy.Roots(workspace.OriginLocal)) > 0 {
-		if cfg.OutsideAccess.Remote {
-			fmt.Println("[!] Extra roots are also available through the public tunnel (outsideAccess.remote)")
+		if cfg.OutsideAccess.RemoteEnabled() {
+			fmt.Println("[!] Extra roots are also available through the public tunnel (disable with outsideAccess.remote: false or the GUI checkbox)")
 		} else {
 			fmt.Println("[ok] Extra roots are local-only; tunnel requests stay confined to the workspace")
 		}

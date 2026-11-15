@@ -49,7 +49,7 @@ func extraRootFixture(t *testing.T, origin workspace.Origin, remote bool) (ctx c
 			{Path: shared, Access: "read"},
 			{Path: rw, Access: "readwrite"},
 		},
-		Remote: remote,
+		Remote: &remote,
 	}
 	policy, problems := workspace.NewAccessPolicy(cfg)
 	if len(problems) > 0 {

@@ -143,7 +143,7 @@ an extra root (GUI: *Extra folders outside the workspace*, one `ro <path>` or
     { "path": "D:/code/shared-lib", "access": "read" },
     { "path": "D:/scratch",         "access": "readwrite" }
   ],
-  "remote": false,
+  "remote": true,
   "deny": ["D:/code/shared-lib/private"],
   "audit": true
 }
@@ -152,7 +152,7 @@ an extra root (GUI: *Extra folders outside the workspace*, one `ro <path>` or
 | Field | Default | Description |
 |---|---|---|
 | `roots[].access` | `read` | `read` (read, ls, grep, glob) or `readwrite` (also write, edit, mkdir, move, shell working directory) |
-| `remote` | `false` | Also grant the roots to requests that arrive through the public tunnel. Off: tunnel requests stay confined to the workspace |
+| `remote` | `true` | Also grant the roots to requests that arrive through the public tunnel. Set `false` (or untick the GUI checkbox) to keep tunnel requests confined to the workspace. The tunnel has no authentication: whoever knows its temporary URL gets the same access |
 | `deny` | `[]` | Extra absolute paths that stay blocked inside the roots |
 | `audit` | `true` | Log every outside-workspace access (allowed or denied) to `.devspace-state/outside-access.log` |
 
@@ -166,6 +166,10 @@ roots. System folders (`C:\Windows`, `Program Files`, `/etc`, ...) are blocked
 unless you configure a root inside them. A whole drive (`C:\`, `/`) is not
 accepted as a root. `devspace doctor` lists the active roots and any ignored
 entries.
+
+pnpm on Windows: `node_modules` entries are junctions into the pnpm store
+outside the project. File tools no longer follow junctions out of the
+workspace, so add the store (`pnpm store path`) as a `read` root.
 
 ---
 
@@ -227,7 +231,7 @@ Set `"shell"` in config.json or choose in the GUI.
 ## Security
 
 - **No built-in authentication** — anyone with the public tunnel URL can use the server
-- **Path containment** — every tool path (read, write, edit, mkdir, move, ls, grep, glob and the shell working directory) is resolved inside the workspace root; `..`, absolute paths elsewhere and symlinks/junctions pointing outside are rejected. Folders configured in `outsideAccess` are the only exception, local-only by default (see above)
+- **Path containment** — every tool path (read, write, edit, mkdir, move, ls, grep, glob and the shell working directory) is resolved inside the workspace root; `..`, absolute paths elsewhere and symlinks/junctions pointing outside are rejected. Folders configured in `outsideAccess` are the only exception; they are also reachable through the tunnel unless `outsideAccess.remote` is `false` (see above)
 - **The shell tool is not a sandbox** — `bash` runs arbitrary commands with your user's permissions; path containment only applies to the file tools
 - **Tunnel access** — treat the public tunnel URL as a secret and stop the server when it is not in use
 - **No third-party uploads** — your code never leaves your machine
